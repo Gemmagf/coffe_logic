@@ -1,0 +1,218 @@
+// coffe_logic – Prisma Schema (SQLite per a demo local)
+// Massiu Soft · Swiss multi-local café management platform
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "sqlite"
+  url      = env("DATABASE_URL")
+}
+
+// ─── Enums (SQLite no suporta enums natius — fem servir String) ───────────────
+
+// Role: OWNER | MANAGER | EMPLOYEE
+// Plan: SOLO | MULTI | MULTI_PLUS
+// OrderStatus: DRAFT | SENT | RECEIVED
+// VacationStatus: PENDING | APPROVED | REJECTED
+// DayOfWeek: MON | TUE | WED | THU | FRI | SAT | SUN
+
+// ─── Models ──────────────────────────────────────────────────────────────────
+
+model Group {
+  id        String   @id @default(cuid())
+  name      String
+  plan      String   @default("SOLO")
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  users     User[]
+  locations Location[]
+  employees Employee[]
+  suppliers Supplier[]
+
+  @@map("groups")
+}
+
+model User {
+  id           String   @id @default(cuid())
+  email        String   @unique
+  passwordHash String
+  role         String   @default("EMPLOYEE")
+  createdAt    DateTime @default(now())
+  updatedAt    DateTime @updatedAt
+
+  groupId String
+  group   Group  @relation(fields: [groupId], references: [id], onDelete: Cascade)
+
+  @@index([groupId])
+  @@map("users")
+}
+
+model Location {
+  id        String   @id @default(cuid())
+  name      String
+  address   String?
+  timezone  String   @default("Europe/Zurich")
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  groupId      String
+  group        Group              @relation(fields: [groupId], references: [id], onDelete: Cascade)
+  employees    EmployeeLocation[]
+  schedules    Schedule[]
+  orders       Order[]
+  cashClosings CashClosing[]
+
+  @@index([groupId])
+  @@map("locations")
+}
+
+model Employee {
+  id        String   @id @default(cuid())
+  name      String
+  email     String?
+  phone     String?
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  groupId          String
+  group            Group              @relation(fields: [groupId], references: [id], onDelete: Cascade)
+  locations        EmployeeLocation[]
+  schedules        Schedule[]
+  vacationRequests VacationRequest[]
+  shiftPreferences ShiftPreference[]
+
+  @@index([groupId])
+  @@map("employees")
+}
+
+model EmployeeLocation {
+  employeeId String
+  locationId String
+  assignedAt DateTime @default(now())
+
+  employee Employee @relation(fields: [employeeId], references: [id], onDelete: Cascade)
+  location Location @relation(fields: [locationId], references: [id], onDelete: Cascade)
+
+  @@id([employeeId, locationId])
+  @@map("employee_locations")
+}
+
+model Schedule {
+  id        String   @id @default(cuid())
+  date      String   // "YYYY-MM-DD"
+  startTime String   // "HH:MM"
+  endTime   String   // "HH:MM"
+  notes     String?
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  employeeId String
+  employee   Employee @relation(fields: [employeeId], references: [id], onDelete: Cascade)
+  locationId String
+  location   Location @relation(fields: [locationId], references: [id], onDelete: Cascade)
+
+  @@index([employeeId])
+  @@index([locationId])
+  @@index([date])
+  @@map("schedules")
+}
+
+model Supplier {
+  id        String   @id @default(cuid())
+  name      String
+  contact   String?
+  email     String?
+  phone     String?
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  groupId String
+  group   Group   @relation(fields: [groupId], references: [id], onDelete: Cascade)
+  orders  Order[]
+
+  @@index([groupId])
+  @@map("suppliers")
+}
+
+model Order {
+  id         String   @id @default(cuid())
+  status     String   @default("DRAFT")
+  items      String   @default("[]") // JSON string
+  notes      String?
+  deliveryAt String?  // ISO date string
+  createdAt  DateTime @default(now())
+  updatedAt  DateTime @updatedAt
+
+  supplierId String
+  supplier   Supplier @relation(fields: [supplierId], references: [id], onDelete: Restrict)
+  locationId String
+  location   Location @relation(fields: [locationId], references: [id], onDelete: Cascade)
+
+  @@index([supplierId])
+  @@index([locationId])
+  @@map("orders")
+}
+
+model CashClosing {
+  id            String   @id @default(cuid())
+  date          String   // "YYYY-MM-DD"
+  openingAmount Float
+  closingAmount Float
+  sales         Float
+  cardSales     Float    @default(0)
+  cashSales     Float    @default(0)
+  expenses      Float    @default(0)
+  notes         String?
+  createdAt     DateTime @default(now())
+  updatedAt     DateTime @updatedAt
+
+  locationId String
+  location   Location @relation(fields: [locationId], references: [id], onDelete: Cascade)
+
+  @@unique([locationId, date])
+  @@index([locationId])
+  @@map("cash_closings")
+}
+
+/// Sol·licitud de vacances d'un empleat
+/// Status: PENDING | APPROVED | REJECTED
+model VacationRequest {
+  id         String   @id @default(cuid())
+  fromDate   String   // "YYYY-MM-DD"
+  toDate     String   // "YYYY-MM-DD"
+  reason     String?
+  status     String   @default("PENDING")
+  managerNote String? // nota del manager en aprovar/rebutjar
+  createdAt  DateTime @default(now())
+  updatedAt  DateTime @updatedAt
+
+  employeeId String
+  employee   Employee @relation(fields: [employeeId], references: [id], onDelete: Cascade)
+
+  @@index([employeeId])
+  @@index([status])
+  @@map("vacation_requests")
+}
+
+/// Preferències de torn d'un empleat
+/// dayOfWeek: MON | TUE | WED | THU | FRI | SAT | SUN
+model ShiftPreference {
+  id          String  @id @default(cuid())
+  dayOfWeek   String  // MON | TUE | WED | THU | FRI | SAT | SUN
+  startTime   String  // "HH:MM" hora preferida d'entrada
+  endTime     String  // "HH:MM" hora preferida de sortida
+  locationId  String? // local preferit (opcional)
+  notes       String?
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  employeeId String
+  employee   Employee  @relation(fields: [employeeId], references: [id], onDelete: Cascade)
+
+  @@unique([employeeId, dayOfWeek])
+  @@index([employeeId])
+  @@map("shift_preferences")
+}

@@ -1,0 +1,188 @@
+/* ─── Cafgic Design System ───────────────────────────────────────────────── */
+
+:root {
+  --color-bg:          #F5F3EC;
+  --color-sidebar:     #2D3250;
+  --color-accent:      #F4E285;
+  --color-accent2:     #E8A838;
+  --color-card:        #FFFFFF;
+  --color-border:      #E8E4D9;
+  --color-text:        #2D3250;
+  --color-text-sec:    #6B7280;
+  --color-success:     #5aab7a;
+  --color-warning:     #E8A838;
+  --color-error:       #c0392b;
+  --color-blue:        #4f7bdb;
+
+  --radius-sm:  6px;
+  --radius-md:  10px;
+  --radius-lg:  14px;
+
+  --shadow-sm:  0 1px 4px rgba(45, 50, 80, 0.07);
+  --shadow-md:  0 4px 16px rgba(45, 50, 80, 0.10);
+  --shadow-lg:  0 8px 32px rgba(45, 50, 80, 0.13);
+
+  --transition: all 0.15s ease;
+}
+
+/* ─── Reset ──────────────────────────────────────────────────────────────── */
+
+*, *::before, *::after {
+  box-sizing: border-box;
+}
+
+html, body, #root {
+  margin: 0;
+  padding: 0;
+  height: 100%;
+}
+
+body {
+  font-family: -apple-system, 'Inter', BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif;
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+  background-color: var(--color-bg);
+  color: var(--color-text);
+  line-height: 1.5;
+}
+
+input, select, textarea, button {
+  font-family: inherit;
+}
+
+a {
+  text-decoration: none;
+  color: inherit;
+  transition: var(--transition);
+}
+
+button {
+  transition: var(--transition);
+}
+
+/* ─── Focus visible ──────────────────────────────────────────────────────── */
+
+:focus-visible {
+  outline: 2.5px solid var(--color-accent);
+  outline-offset: 2px;
+}
+
+/* ─── Scrollbar ──────────────────────────────────────────────────────────── */
+
+::-webkit-scrollbar {
+  width: 6px;
+  height: 6px;
+}
+
+::-webkit-scrollbar-track {
+  background: transparent;
+}
+
+::-webkit-scrollbar-thumb {
+  background: #D4CFC6;
+  border-radius: 3px;
+}
+
+::-webkit-scrollbar-thumb:hover {
+  background: #B8B2A8;
+}
+
+/* ─── Utility classes ────────────────────────────────────────────────────── */
+
+/* Card */
+.cafgic-card {
+  background-color: var(--color-card);
+  border-radius: var(--radius-lg);
+  border: 1px solid var(--color-border);
+  box-shadow: var(--shadow-sm);
+  transition: var(--transition);
+}
+
+.cafgic-card:hover {
+  transform: translateY(-1px);
+  box-shadow: var(--shadow-md);
+}
+
+/* Primary button */
+.cafgic-btn-primary {
+  background-color: var(--color-sidebar);
+  color: var(--color-accent);
+  border: none;
+  border-radius: var(--radius-md);
+  padding: 9px 18px;
+  font-size: 13px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: var(--transition);
+}
+
+.cafgic-btn-primary:hover {
+  background-color: #3d4470;
+}
+
+/* Outline button */
+.cafgic-btn-outline {
+  background-color: transparent;
+  color: var(--color-sidebar);
+  border: 1.5px solid var(--color-sidebar);
+  border-radius: var(--radius-md);
+  padding: 9px 18px;
+  font-size: 13px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: var(--transition);
+}
+
+.cafgic-btn-outline:hover {
+  background-color: var(--color-bg);
+}
+
+/* Input */
+.cafgic-input {
+  padding: 8px 10px;
+  border: 1.5px solid var(--color-border);
+  border-radius: var(--radius-sm);
+  font-size: 13px;
+  outline: none;
+  background-color: var(--color-card);
+  color: var(--color-text);
+  transition: border-color 0.15s ease;
+}
+
+.cafgic-input:focus {
+  border-color: var(--color-accent);
+  outline: none;
+}
+
+/* Badge / status pill */
+.cafgic-badge {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  padding: 2px 9px;
+  border-radius: 20px;
+  font-size: 11px;
+  font-weight: 700;
+  letter-spacing: 0.3px;
+  text-transform: uppercase;
+}
+
+.cafgic-badge--success {
+  background-color: rgba(90, 171, 122, 0.15);
+  color: var(--color-success);
+}
+
+.cafgic-badge--warning {
+  background-color: rgba(232, 168, 56, 0.15);
+  color: var(--color-warning);
+}
+
+.cafgic-badge--error {
+  background-color: rgba(192, 57, 43, 0.12);
+  color: var(--color-error);
+}
+
+.cafgic-badge--blue {
+  background-color: rgba(79, 123, 219, 0.12);
+  color: var(--color-blue);
+}
