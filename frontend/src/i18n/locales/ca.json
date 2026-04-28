@@ -13,7 +13,8 @@
     "login": "Entrar →",
     "loggingIn": "Iniciant sessió...",
     "subtitle": "Gestió multi-local · Massiu Soft",
-    "demo": "Demo: owner@commercial.ch · demo1234"
+    "demo": "Demo: owner@commercial.ch · demo1234",
+    "tryDemo": "Provar la demo"
   },
   "dashboard": {
     "goodMorning": "Bon dia",

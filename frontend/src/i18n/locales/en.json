@@ -13,7 +13,8 @@
     "login": "Sign in →",
     "loggingIn": "Signing in...",
     "subtitle": "Multi-location management · Massiu Soft",
-    "demo": "Demo: owner@commercial.ch · demo1234"
+    "demo": "Demo: owner@commercial.ch · demo1234",
+    "tryDemo": "Try demo"
   },
   "dashboard": {
     "goodMorning": "Good morning",

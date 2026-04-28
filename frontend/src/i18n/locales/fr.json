@@ -13,7 +13,8 @@
     "login": "Se connecter →",
     "loggingIn": "Connexion...",
     "subtitle": "Gestion multi-site · Massiu Soft",
-    "demo": "Démo : owner@commercial.ch · demo1234"
+    "demo": "Démo : owner@commercial.ch · demo1234",
+    "tryDemo": "Essayer la démo"
   },
   "dashboard": {
     "goodMorning": "Bonjour",
