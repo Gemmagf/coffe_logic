@@ -44,7 +44,7 @@ router.post('/login', async (req: Request, res: Response, next: NextFunction) =>
     const token = generateToken({
       userId: user.id,
       groupId: user.groupId,
-      role: user.role,
+      role: user.role as import("../types").Role,
       email: user.email,
     });
 
@@ -55,7 +55,7 @@ router.post('/login', async (req: Request, res: Response, next: NextFunction) =>
         user: {
           id: user.id,
           email: user.email,
-          role: user.role,
+          role: user.role as import("../types").Role,
           group: { id: user.group.id, name: user.group.name, plan: user.group.plan },
         },
       },
@@ -89,7 +89,7 @@ router.post('/register', async (req: Request, res: Response, next: NextFunction)
     const token = generateToken({
       userId: user.id,
       groupId: user.groupId,
-      role: user.role,
+      role: user.role as import("../types").Role,
       email: user.email,
     });
 
@@ -100,7 +100,7 @@ router.post('/register', async (req: Request, res: Response, next: NextFunction)
         user: {
           id: user.id,
           email: user.email,
-          role: user.role,
+          role: user.role as import("../types").Role,
           group: { id: group.id, name: group.name, plan: group.plan },
         },
       },
@@ -136,7 +136,7 @@ router.get('/me', async (req: Request, res: Response, next: NextFunction) => {
       data: {
         id: user.id,
         email: user.email,
-        role: user.role,
+        role: user.role as import("../types").Role,
         group: { id: user.group.id, name: user.group.name, plan: user.group.plan },
       },
     });

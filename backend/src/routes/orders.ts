@@ -84,7 +84,7 @@ router.post('/', authorize('OWNER', 'MANAGER'), async (req: AuthRequest, res: Re
         locationId: body.locationId,
         items: JSON.stringify(body.items),
         notes: body.notes,
-        deliveryAt: body.deliveryAt ? new Date(body.deliveryAt) : null,
+        deliveryAt: body.deliveryAt ?? null,
       },
       include: {
         supplier: { select: { id: true, name: true } },
@@ -162,7 +162,7 @@ router.put('/:id', authorize('OWNER', 'MANAGER'), async (req: AuthRequest, res: 
         locationId: body.locationId,
         items: JSON.stringify(body.items),
         notes: body.notes,
-        deliveryAt: body.deliveryAt ? new Date(body.deliveryAt) : null,
+        deliveryAt: body.deliveryAt ?? null,
       },
       include: {
         supplier: { select: { id: true, name: true } },

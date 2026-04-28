@@ -22,8 +22,15 @@ const PORT = process.env.PORT ?? 4000;
 // ─── Global Middleware ────────────────────────────────────────────────────────
 
 app.use(helmet());
+const allowedOrigins = (process.env.CORS_ORIGIN ?? 'http://localhost:5173,http://localhost:5200')
+  .split(',')
+  .map((o) => o.trim());
+
 app.use(cors({
-  origin: process.env.CORS_ORIGIN ?? 'http://localhost:5173',
+  origin: (origin, cb) => {
+    if (!origin || allowedOrigins.some((o) => origin.startsWith(o))) return cb(null, true);
+    cb(new Error(`CORS: origen no permès: ${origin}`));
+  },
   credentials: true,
 }));
 app.use(morgan(process.env.NODE_ENV === 'production' ? 'combined' : 'dev'));
