@@ -39,11 +39,11 @@ jobs:
         working-directory: frontend
         run: npm ci
 
-      - name: Build
+      - name: Build (demo mode — no backend needed)
         working-directory: frontend
         env:
           VITE_BASE_URL: /coffe_logic/
-          VITE_API_URL: ${{ secrets.VITE_API_URL }}
+          VITE_DEMO_MODE: "true"
         run: npm run build
 
       - name: Setup Pages
