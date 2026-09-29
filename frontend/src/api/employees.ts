@@ -8,7 +8,7 @@ import {
 
 // ─── Empleats ─────────────────────────────────────────────────────────────────
 
-export interface EmployeePayload { name: string; email?: string | null; phone?: string | null; locationIds?: string[] }
+export interface EmployeePayload { name: string; email?: string | null; phone?: string | null; position?: string | null; weeklyHours?: number | null; locationIds?: string[] }
 
 export const getEmployees = async (): Promise<Employee[]> => {
   if (DEMO) return mockGetEmployees();

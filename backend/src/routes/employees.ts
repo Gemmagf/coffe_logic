@@ -15,6 +15,8 @@ const EmployeeSchema = z.object({
   name: z.string().min(1),
   email: z.string().email().optional().nullable(),
   phone: z.string().optional().nullable(),
+  position: z.string().optional().nullable(),
+  weeklyHours: z.number().int().min(0).max(80).optional().nullable(),
   locationIds: z.array(z.string()).optional(),
 });
 

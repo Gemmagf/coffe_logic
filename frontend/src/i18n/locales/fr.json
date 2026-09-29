@@ -51,7 +51,7 @@
     "email": "E-mail",
     "password": "Mot de passe",
     "login": "Se connecter",
-    "subtitle": "Gestion multi-sites pour cafés",
+    "subtitle": "Gestion pour cafés, restaurants et bars",
     "welcome": "Bon retour",
     "welcomeSub": "Connectez-vous à votre compte ou essayez la démo avec des données d'exemple.",
     "headline1": "Tout votre café,",
@@ -65,8 +65,10 @@
     "hidePassword": "Masquer le mot de passe",
     "expired": "Votre session a expiré. Veuillez vous reconnecter.",
     "error": "Connexion impossible",
-    "demoModeHint": "Cette version fonctionne sans serveur : n'importe quels identifiants ouvrent la démo.",
-    "demoCredentials": "Compte démo : {{email}} · {{password}}"
+    "demoModeHint": "version sans serveur",
+    "demoCredentials": "Accès démo : utilisateur « {{email}} » · mot de passe « {{password}} »",
+    "identifier": "Nom d’utilisateur ou e-mail",
+    "identifierPlaceholder": "the commercial project"
   },
   "dashboard": {
     "goodMorning": "Bonjour",
@@ -154,7 +156,11 @@
     "emptyWeek": "Aucun service cette semaine",
     "emptyWeekDesc": "Copiez la semaine précédente ou générez une proposition automatique à partir des préférences et des vacances.",
     "hoursByEmployee": "Heures par employé",
-    "hoursByEmployeeSub": "Total planifié cette semaine"
+    "hoursByEmployeeSub": "Total planifié cette semaine",
+    "overContract": "+{{h}} h au-dessus du contrat",
+    "underContract": "{{h}} h en dessous du contrat",
+    "onContract": "Conforme au contrat",
+    "noContract": "Aucune heure contractuelle"
   },
   "employees": {
     "title": "Équipe",
@@ -217,7 +223,11 @@
       "PENDING": "En attente",
       "APPROVED": "Approuvée",
       "REJECTED": "Refusée"
-    }
+    },
+    "position": "Poste",
+    "positionPlaceholder": "Barista, service, cuisine…",
+    "weeklyHours": "Heures contractuelles / semaine",
+    "weeklyHoursHint": "Comparées aux heures planifiées"
   },
   "orders": {
     "title": "Commandes",
@@ -365,7 +375,8 @@
     "legend_partial": "Partiel",
     "legend_uncovered": "Aucun service",
     "weekLabel": "Semaine {{w}}",
-    "noFullWeek": "Pas encore de semaine complète"
+    "noFullWeek": "Pas encore de semaine complète",
+    "fullWeeksOnly": "Semaines complètes uniquement"
   },
   "proposal": {
     "title": "Générer une proposition d'horaires",
@@ -409,7 +420,8 @@
     "configNeeds": "Configurer les besoins",
     "generate": "Générer la proposition",
     "resultOk": "{{n}} services créés.",
-    "resultErrors": "{{ok}} services créés, {{errors}} ignorés pour chevauchement."
+    "resultErrors": "{{ok}} services créés, {{errors}} ignorés pour chevauchement.",
+    "respectContract": "Ne pas dépasser les heures contractuelles hebdomadaires"
   },
   "settings": {
     "title": "Réglages",
@@ -442,7 +454,7 @@
     "theme": "Thème",
     "language": "Langue",
     "about": "À propos de Cafgic",
-    "aboutText": "Plateforme de gestion multi-sites pour cafés : horaires, équipe, commandes, caisse et prévisions, conçue pour le marché suisse.",
+    "aboutText": "Plateforme de gestion multi-sites pour cafés, restaurants et bars : horaires, équipe, commandes, caisse et prévisions, conçue pour le marché suisse.",
     "saved": "Modifications enregistrées.",
     "deleted": "Supprimé."
   }

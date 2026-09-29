@@ -12,8 +12,8 @@ import Button from '../components/ui/Button';
 import Icon from '../components/ui/Icon';
 import { Field, Input } from '../components/ui/Field';
 
-const DEMO_EMAIL = 'owner@commercial.ch';
-const DEMO_PASS = 'demo1234';
+const DEMO_USER = 'the commercial project';
+const DEMO_PASS = 'Nikos';
 
 export default function Login() {
   const { t } = useTranslation();
@@ -90,12 +90,12 @@ export default function Login() {
 
           <button
             type="button" className="btn btn-accent btn-lg btn-block" style={{ height: 52, flexDirection: 'column', gap: 2 }}
-            onClick={() => doLogin(DEMO_EMAIL, DEMO_PASS, 'demo')} disabled={busy !== null}
+            onClick={() => doLogin(DEMO_USER, DEMO_PASS, 'demo')} disabled={busy !== null}
           >
             {busy === 'demo' ? <span className="spinner" /> : (
               <>
                 <span className="row gap-2"><Icon name="sparkles" />{t('auth.tryDemo')}</span>
-                <span style={{ fontSize: 10.5, fontWeight: 600, opacity: 0.7, letterSpacing: '0.04em', textTransform: 'uppercase' }}>The Commercial Project · Zürich</span>
+                <span style={{ fontSize: 10.5, fontWeight: 600, opacity: 0.7, letterSpacing: '0.04em', textTransform: 'uppercase' }}>Commercial – The Project · Zürich</span>
               </>
             )}
           </button>
@@ -107,8 +107,8 @@ export default function Login() {
           </div>
 
           <form onSubmit={handleSubmit} className="col gap-4">
-            <Field label={t('auth.email')} htmlFor="email">
-              <Input id="email" type="email" autoComplete="email" value={email} onChange={(e) => setEmail(e.target.value)} placeholder="propietari@local.ch" />
+            <Field label={t('auth.identifier')} htmlFor="email">
+              <Input id="email" type="text" autoComplete="username" value={email} onChange={(e) => setEmail(e.target.value)} placeholder={t('auth.identifierPlaceholder')} />
             </Field>
             <Field label={t('auth.password')} htmlFor="password">
               <div style={{ position: 'relative' }}>
@@ -127,7 +127,7 @@ export default function Login() {
           </form>
 
           <p className="t-xs t-4 mt-6" style={{ textAlign: 'center' }}>
-            {DEMO ? t('auth.demoModeHint') : t('auth.demoCredentials', { email: DEMO_EMAIL, password: DEMO_PASS })}
+            {t('auth.demoCredentials', { email: DEMO_USER, password: DEMO_PASS })}{DEMO ? ` · ${t('auth.demoModeHint')}` : ''}
           </p>
         </div>
       </section>

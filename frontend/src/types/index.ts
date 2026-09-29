@@ -37,6 +37,8 @@ export interface Employee {
   name: string;
   email?: string;
   phone?: string;
+  position?: string | null;
+  weeklyHours?: number | null;
   groupId: string;
   locations?: { locationId: string; location: Pick<Location, 'id' | 'name'> }[];
   createdAt: string;

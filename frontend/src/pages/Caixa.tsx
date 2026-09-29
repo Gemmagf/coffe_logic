@@ -97,7 +97,7 @@ export default function Caixa() {
 
   const num = (key: 'openingAmount' | 'closingAmount' | 'cardSales' | 'cashSales' | 'expenses', label: string, hint?: string) => (
     <Field label={label} hint={hint} required>
-      <Input type="number" step="0.05" min="0" addon="CHF" value={form[key]} onChange={(e) => setForm({ ...form, [key]: parseFloat(e.target.value) || 0 })} onFocus={(e) => e.target.select()} required />
+      <Input type="number" step="0.01" min="0" addon="CHF" value={form[key]} onChange={(e) => setForm({ ...form, [key]: parseFloat(e.target.value) || 0 })} onFocus={(e) => e.target.select()} required />
     </Field>
   );
 

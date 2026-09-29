@@ -51,7 +51,7 @@ export default function Empleats() {
   const prefM = usePreferenceMutations();
 
   const [empModal, setEmpModal] = useState<{ open: boolean; editing?: Employee | null }>({ open: false });
-  const [empForm, setEmpForm] = useState({ name: '', email: '', phone: '', locationIds: [] as string[] });
+  const [empForm, setEmpForm] = useState({ name: '', email: '', phone: '', position: '', weeklyHours: '' as string | number, locationIds: [] as string[] });
   const [vacModal, setVacModal] = useState(false);
   const [vacForm, setVacForm] = useState({ employeeId: '', fromDate: '', toDate: '', reason: '' });
   const [prefModal, setPrefModal] = useState(false);
@@ -85,13 +85,13 @@ export default function Empleats() {
   // ── Employee CRUD ───────────────────────────────────────────────────────────
   const openEmp = (editing?: Employee) => {
     setFormError('');
-    setEmpForm(editing ? { name: editing.name, email: editing.email ?? '', phone: editing.phone ?? '', locationIds: editing.locations?.map((l) => l.locationId) ?? [] } : { name: '', email: '', phone: '', locationIds: [] });
+    setEmpForm(editing ? { name: editing.name, email: editing.email ?? '', phone: editing.phone ?? '', position: editing.position ?? '', weeklyHours: editing.weeklyHours ?? '', locationIds: editing.locations?.map((l) => l.locationId) ?? [] } : { name: '', email: '', phone: '', position: '', weeklyHours: '', locationIds: [] });
     setEmpModal({ open: true, editing });
   };
   const saveEmp = async (e: React.FormEvent) => {
     e.preventDefault(); setFormError('');
     try {
-      const p = { name: empForm.name.trim(), email: empForm.email.trim() || null, phone: empForm.phone.trim() || null, locationIds: empForm.locationIds };
+      const p = { name: empForm.name.trim(), email: empForm.email.trim() || null, phone: empForm.phone.trim() || null, position: empForm.position.trim() || null, weeklyHours: empForm.weeklyHours === '' ? null : Number(empForm.weeklyHours), locationIds: empForm.locationIds };
       if (empModal.editing) await empM.update.mutateAsync({ id: empModal.editing.id, p }); else await empM.create.mutateAsync(p);
       toast.success(t(empModal.editing ? 'employees.updated' : 'employees.createdOk'));
       setEmpModal({ open: false });
@@ -171,7 +171,8 @@ export default function Empleats() {
                       <Avatar name={emp.name} id={emp.id} size={44} />
                       <div className="grow" style={{ minWidth: 0 }}>
                         <div className="t-strong t-truncate" style={{ fontSize: 15 }}>{emp.name}</div>
-                        {emp.email && <div className="t-sm t-3 t-truncate row gap-2"><Icon name="mail" size={12} />{emp.email}</div>}
+                        {emp.position && <div className="t-sm t-2 t-truncate">{emp.position}</div>}
+                        {emp.email && <div className="t-sm t-3 row gap-2" style={{ minWidth: 0 }}><Icon name="mail" size={12} style={{ flexShrink: 0 }} /><span className="t-truncate">{emp.email}</span></div>}
                         {emp.phone && <div className="t-sm t-3 row gap-2"><Icon name="phone" size={12} />{emp.phone}</div>}
                       </div>
                       {canManage && (
@@ -185,10 +186,15 @@ export default function Empleats() {
                       {(emp.locations ?? []).map((l) => <span key={l.locationId} className="chip" style={{ height: 22, fontSize: 11 }}><Icon name="mapPin" size={11} />{l.location.name}</span>)}
                       {(emp.locations ?? []).length === 0 && <span className="t-xs t-4">{t('employees.noLocations')}</span>}
                     </div>
-                    <div className="row between t-xs t-3" style={{ paddingTop: 8, borderTop: '1px solid var(--border)' }}>
-                      <span><b className="t-2">{fmtHours(hoursThisWeek[emp.id] ?? 0)}</b> {t('employees.thisWeek')}</span>
-                      <span>{t('employees.prefsCount', { n: prefs.length })}</span>
-                      {approved.length > 0 && <Badge tone="info" dot>{t('employees.upcomingVac')}</Badge>}
+                    <div className="col" style={{ gap: 6, paddingTop: 8, borderTop: '1px solid var(--border)' }}>
+                      <div className="row between t-xs t-3">
+                        <span><b className="t-2">{fmtHours(hoursThisWeek[emp.id] ?? 0)}</b>{emp.weeklyHours ? ` / ${emp.weeklyHours} h` : ''} {t('employees.thisWeek')}</span>
+                        <span>{t('employees.prefsCount', { n: prefs.length })}</span>
+                        {approved.length > 0 && <Badge tone="info" dot>{t('employees.upcomingVac')}</Badge>}
+                      </div>
+                      {emp.weeklyHours ? (
+                        <div className="progress"><div style={{ width: `${Math.min(100, ((hoursThisWeek[emp.id] ?? 0) / emp.weeklyHours) * 100)}%`, background: (hoursThisWeek[emp.id] ?? 0) > emp.weeklyHours ? 'var(--danger)' : 'var(--success)' }} /></div>
+                      ) : null}
                     </div>
                   </Card>
                 );
@@ -300,9 +306,12 @@ export default function Empleats() {
         <form id="emp-form" onSubmit={saveEmp} className="col gap-4">
           <Field label={t('employees.name')} required><Input value={empForm.name} onChange={(e) => setEmpForm({ ...empForm, name: e.target.value })} required autoFocus /></Field>
           <div className="form-grid">
+            <Field label={t('employees.position')}><Input value={empForm.position} onChange={(e) => setEmpForm({ ...empForm, position: e.target.value })} placeholder={t('employees.positionPlaceholder')} list="position-suggestions" /></Field>
+            <Field label={t('employees.weeklyHours')} hint={t('employees.weeklyHoursHint')}><Input type="number" min={0} max={80} value={empForm.weeklyHours} onChange={(e) => setEmpForm({ ...empForm, weeklyHours: e.target.value })} addon="h" /></Field>
             <Field label={t('auth.email')}><Input type="email" value={empForm.email} onChange={(e) => setEmpForm({ ...empForm, email: e.target.value })} /></Field>
             <Field label={t('employees.phone')}><Input value={empForm.phone} onChange={(e) => setEmpForm({ ...empForm, phone: e.target.value })} placeholder="+41 79 …" /></Field>
           </div>
+          <datalist id="position-suggestions">{['Head barista', 'Barista', 'Roaster', 'Service', 'Kitchen', 'Bartender', 'Manager'].map((x) => <option key={x} value={x} />)}</datalist>
           <Field label={t('employees.locations')} hint={t('employees.locationsHint')}>
             <div className="row-wrap" style={{ gap: 10 }}>
               {locations.data?.map((l) => (

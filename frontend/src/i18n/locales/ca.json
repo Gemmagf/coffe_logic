@@ -51,7 +51,7 @@
     "email": "Correu electrònic",
     "password": "Contrasenya",
     "login": "Entrar",
-    "subtitle": "Gestió multi-local per a cafeteries",
+    "subtitle": "Gestió per a cafeteries, restaurants i bars",
     "welcome": "Benvingut/da de nou",
     "welcomeSub": "Entra al teu compte o prova la demo amb dades d'exemple.",
     "headline1": "Tot el teu cafè,",
@@ -65,8 +65,10 @@
     "hidePassword": "Amagar la contrasenya",
     "expired": "La sessió ha caducat. Torna a iniciar sessió.",
     "error": "No s'ha pogut iniciar sessió",
-    "demoModeHint": "Aquesta versió funciona sense servidor: qualsevol credencial obre la demo.",
-    "demoCredentials": "Compte de demo: {{email}} · {{password}}"
+    "demoModeHint": "versió sense servidor",
+    "demoCredentials": "Accés de demo: usuari «{{email}}» · contrasenya «{{password}}»",
+    "identifier": "Usuari o correu electrònic",
+    "identifierPlaceholder": "the commercial project"
   },
   "dashboard": {
     "goodMorning": "Bon dia",
@@ -154,7 +156,11 @@
     "emptyWeek": "Cap torn aquesta setmana",
     "emptyWeekDesc": "Copia la setmana anterior o genera una proposta automàtica a partir de les preferències i les vacances.",
     "hoursByEmployee": "Hores per empleat",
-    "hoursByEmployeeSub": "Total planificat aquesta setmana"
+    "hoursByEmployeeSub": "Total planificat aquesta setmana",
+    "overContract": "+{{h}} h sobre el contracte",
+    "underContract": "{{h}} h per sota del contracte",
+    "onContract": "Segons contracte",
+    "noContract": "Sense hores de contracte"
   },
   "employees": {
     "title": "Empleats",
@@ -217,7 +223,11 @@
       "PENDING": "Pendent",
       "APPROVED": "Aprovada",
       "REJECTED": "Rebutjada"
-    }
+    },
+    "position": "Posició",
+    "positionPlaceholder": "Barista, servei, cuina…",
+    "weeklyHours": "Hores de contracte / setmana",
+    "weeklyHoursHint": "Per comparar amb les hores planificades"
   },
   "orders": {
     "title": "Comandes",
@@ -365,7 +375,8 @@
     "legend_partial": "Parcial",
     "legend_uncovered": "Sense torns",
     "weekLabel": "Setmana {{w}}",
-    "noFullWeek": "Cap setmana completa encara"
+    "noFullWeek": "Cap setmana completa encara",
+    "fullWeeksOnly": "Només setmanes completes"
   },
   "proposal": {
     "title": "Generar proposta d'horaris",
@@ -409,7 +420,8 @@
     "configNeeds": "Configurar necessitats",
     "generate": "Generar proposta",
     "resultOk": "{{n}} torns creats correctament.",
-    "resultErrors": "{{ok}} torns creats, {{errors}} omesos per solapament."
+    "resultErrors": "{{ok}} torns creats, {{errors}} omesos per solapament.",
+    "respectContract": "No superar les hores de contracte setmanals"
   },
   "settings": {
     "title": "Configuració",
@@ -442,7 +454,7 @@
     "theme": "Tema",
     "language": "Idioma",
     "about": "Sobre Cafgic",
-    "aboutText": "Plataforma de gestió multi-local per a cafeteries: horaris, equip, comandes, caixa i previsió, pensada per al mercat suís.",
+    "aboutText": "Plataforma de gestió multi-local per a cafeteries, restaurants i bars: horaris, equip, comandes, caixa i previsió, pensada per al mercat suís.",
     "saved": "Canvis guardats.",
     "deleted": "Eliminat."
   }

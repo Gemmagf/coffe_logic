@@ -1,6 +1,6 @@
 # Cafgic — gestió multi-local per a cafeteries
 
-Plataforma de **Massiu Soft** per a grups de cafeteries del mercat suís: horaris i torns, equip, comandes a proveïdors, tancaments de caixa i previsió. Interfície en sis idiomes (DE · FR · IT · EN · CA · EL), mode clar i fosc, i disseny responsiu per a mòbil.
+Plataforma de **Massiu Soft** per a cafeteries, restaurants i bars amb un o més locals al mercat suís: horaris i torns, equip, comandes a proveïdors, tancaments de caixa i previsió. Interfície en sis idiomes (DE · FR · IT · EN · CA · EL), mode clar i fosc, i disseny responsiu per a mòbil.
 
 **Demo pública (sense servidor):** https://gemmagf.github.io/coffe_logic/ — clica *Provar la demo*.
 
@@ -23,7 +23,9 @@ npm run db:seed             # dades de demo (The Commercial Project)
 npm run dev                 # backend :4000 + frontend :5173
 ```
 
-Credencials de demo: `owner@commercial.ch` / `demo1234` (també `manager@commercial.ch`).
+Credencials de demo (propietari): usuari `the commercial project` / contrasenya `Nikos`. Manager: `elena` / `demo1234`. També s'accepta el correu (`nick@commercial-theproject.ch`).
+
+La demo reprodueix **Commercial – The Project**, la cafeteria d'especialitat de Zúric (Feldstrasse 61 al Kreis 4 i Bahnhofstrasse 75/79) amb un tercer local inventat, el Roastery Lab: equip de 9 persones amb hores de contracte, torradors reals com a proveïdors (MAME, Rose, Balloon), forn John Baker, vendes diàries de 8 setmanes i torns de 5 setmanes.
 
 ### Mode demo sense backend
 
@@ -46,8 +48,8 @@ npm run build:demo          # VITE_DEMO_MODE=true → totes les crides van a dad
 ## Funcionalitats
 
 - **Inici**: KPIs de vendes, torns i comandes; evolució de vendes 14 dies; línia de temps dels torns d'avui per local; avisos (dies descoberts, proveïdors endarrerits, vacances pendents).
-- **Horaris**: graella setmanal i vista per persona, crear/editar torns en modal amb validació de solapaments, copiar la setmana anterior, assistent de proposta automàtica (vacances, preferències, locals habituals, màxim de dies per setmana).
-- **Empleats**: alta/edició/baixa amb locals habituals, sol·licituds de vacances amb aprovació i nota, preferències de torn per dia.
+- **Horaris**: graella setmanal i vista per persona, crear/editar torns en modal amb validació de solapaments, copiar la setmana anterior, hores planificades vs. hores de contracte per persona, assistent de proposta automàtica (vacances, preferències, locals habituals, màxim de dies i hores de contracte per setmana).
+- **Empleats**: alta/edició/baixa amb posició, hores de contracte i locals habituals, sol·licituds de vacances amb aprovació i nota, preferències de torn per dia.
 - **Comandes**: pipeline per estat, suggeriments automàtics per a proveïdors endarrerits (comanda ràpida o personalitzada), detall amb totals.
 - **Caixa**: tancaments per tipus de pagament amb efectiu esperat i diferència calculada, gràfics de vendes diàries i per dia de la setmana.
 - **Planificació**: previsió de vendes, tendència setmanal, productes més demanats, freqüència per proveïdor, cobertura de torns a 14 dies.

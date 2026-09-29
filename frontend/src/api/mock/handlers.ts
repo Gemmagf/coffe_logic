@@ -13,7 +13,7 @@ import type { CashClosingPayload } from '../cashClosings';
 import type { VacationPayload, PreferencePayload } from '../employees';
 import type { CashAnalytics, OrdersAnalytics, StaffingAnalytics } from '../analytics';
 import {
-  LOCATIONS, EMPLOYEES, PREFERENCES,
+  LOCATIONS, EMPLOYEES, PREFERENCES, SUPPLIERS,
   TODAY, addDays, fmt,
   SCHEDULES as _SCHEDULES,
   ORDERS as _ORDERS,
@@ -25,12 +25,7 @@ import {
 
 let locations:    Location[]        = [...LOCATIONS];
 let employees:    Employee[]        = [...EMPLOYEES];
-let suppliers:    Supplier[]        = [
-  { id: 'sup-01', name: 'Kaffee Zürich AG',      contact: 'Hans Keller',  email: 'orders@kaffeezurich.ch', phone: '+41 44 200 10 20', groupId: 'demo-group-001' },
-  { id: 'sup-02', name: 'Bäckerei Hug AG',       contact: 'Maria Hug',    email: 'info@hug-bakery.ch',     phone: '+41 44 300 20 30', groupId: 'demo-group-001' },
-  { id: 'sup-03', name: 'Frische Produkte GmbH', contact: 'Peter Frisch', email: 'orders@frische.ch',      phone: '+41 44 400 30 40', groupId: 'demo-group-001' },
-  { id: 'sup-04', name: 'Swiss Dairy Co.',       contact: 'Ursula Meier', email: 'supply@swissdairy.ch',   phone: '+41 44 500 40 50', groupId: 'demo-group-001' },
-];
+let suppliers:    Supplier[]        = [...SUPPLIERS];
 let schedules:    Schedule[]        = [..._SCHEDULES];
 let orders:       Order[]           = [..._ORDERS];
 let cashClosings: CashClosing[]     = [..._CASH_CLOSINGS];
@@ -52,17 +47,19 @@ function between(date: string, from?: string, to?: string) {
 
 // ─── Auth ─────────────────────────────────────────────────────────────────────
 
-export const mockLogin = async (email: string, _p: string) => {
+/** Demo accounts. Usernames are compared ignoring case and spaces, like the real backend. */
+const DEMO_ACCOUNTS: { username: string; email: string; password: string; role: User['role']; id: string }[] = [
+  { id: 'demo-user-001', username: 'thecommercialproject', email: 'nick@commercial-theproject.ch',  password: 'Nikos',    role: 'OWNER' },
+  { id: 'demo-user-002', username: 'elena',                email: 'elena@commercial-theproject.ch', password: 'demo1234', role: 'MANAGER' },
+];
+const GROUP = { id: 'demo-group-001', name: 'Commercial – The Project', plan: 'MULTI' as const, createdAt: '2024-01-15T08:00:00Z' };
+
+export const mockLogin = async (identifier: string, password: string) => {
   await delay(null);
-  const isManager = email.toLowerCase().startsWith('manager');
-  const user: User = {
-    id: isManager ? 'demo-user-002' : 'demo-user-001',
-    email: email || 'owner@commercial.ch',
-    role: isManager ? 'MANAGER' : 'OWNER',
-    groupId: 'demo-group-001',
-    group: { id: 'demo-group-001', name: 'The Commercial Project', plan: 'MULTI_PLUS', createdAt: '2025-01-01T00:00:00Z' },
-    createdAt: TODAY,
-  };
+  const key = identifier.trim().toLowerCase().replace(/\s+/g, '');
+  const acc = DEMO_ACCOUNTS.find(a => (key.includes('@') ? a.email === key : a.username === key) && a.password === password);
+  if (!acc) throw new Error('Credencials incorrectes');
+  const user: User = { id: acc.id, email: acc.email, role: acc.role, groupId: GROUP.id, group: GROUP, createdAt: TODAY };
   return { token: 'demo-token', user };
 };
 
@@ -98,12 +95,12 @@ export const mockDeleteLocation = async (id: string): Promise<void> => {
 export const mockGetEmployees = (): Promise<Employee[]> => delay([...employees]);
 const empLocations = (ids: string[] = []) => ids.map(locationId => ({ locationId, location: { id: locationId, name: locations.find(l => l.id === locationId)?.name ?? '' } }));
 export const mockCreateEmployee = async (p: EmployeePayload): Promise<Employee> => {
-  const e: Employee = { id: nextId('emp'), name: p.name, email: p.email ?? undefined, phone: p.phone ?? undefined, groupId: 'demo-group-001', createdAt: TODAY, locations: empLocations(p.locationIds) };
+  const e: Employee = { id: nextId('emp'), name: p.name, email: p.email ?? undefined, phone: p.phone ?? undefined, position: p.position ?? null, weeklyHours: p.weeklyHours ?? null, groupId: 'demo-group-001', createdAt: TODAY, locations: empLocations(p.locationIds) };
   employees = [...employees, e];
   return delay(e);
 };
 export const mockUpdateEmployee = async (id: string, p: Partial<EmployeePayload>): Promise<Employee> => {
-  employees = employees.map(e => e.id === id ? { ...e, name: p.name ?? e.name, email: p.email === undefined ? e.email : (p.email ?? undefined), phone: p.phone === undefined ? e.phone : (p.phone ?? undefined), locations: p.locationIds ? empLocations(p.locationIds) : e.locations } : e);
+  employees = employees.map(e => e.id === id ? { ...e, name: p.name ?? e.name, email: p.email === undefined ? e.email : (p.email ?? undefined), phone: p.phone === undefined ? e.phone : (p.phone ?? undefined), position: p.position === undefined ? e.position : p.position, weeklyHours: p.weeklyHours === undefined ? e.weeklyHours : p.weeklyHours, locations: p.locationIds ? empLocations(p.locationIds) : e.locations } : e);
   const e = employees.find(x => x.id === id)!;
   schedules = schedules.map(s => s.employeeId === id ? { ...s, employee: { id, name: e.name } } : s);
   return delay(e);
@@ -301,9 +298,6 @@ export const mockGetOrdersAnalytics = async (): Promise<OrdersAnalytics> => {
   const supMap: Record<string, { name: string; dates: string[] }> = {};
   for (const o of orders) { if (!supMap[o.supplierId]) supMap[o.supplierId] = { name: o.supplier.name, dates: [] }; supMap[o.supplierId].dates.push(o.createdAt.slice(0, 10)); }
   const supplierFrequency = Object.entries(supMap).map(([id, v]) => { const s = v.dates.sort(); const last = s[s.length - 1]; const daysSince = Math.floor((Date.now() - parseLocal(last).getTime()) / 86400000); const avg = s.length > 1 ? Math.round((parseLocal(last).getTime() - parseLocal(s[0]).getTime()) / 86400000 / (s.length - 1)) : 14; return { supplierId: id, supplierName: v.name, totalOrders: v.dates.length, lastOrderDate: last, daysSinceLast: daysSince, avgIntervalDays: avg, overdue: avg > 0 && daysSince > avg * 1.2 }; }).sort((a, b) => b.totalOrders - a.totalOrders);
-  // Demo: the dairy supplier is deliberately "overdue" so the recommendation panel has content.
-  const forced = supplierFrequency.find(sf => sf.supplierId === 'sup-04');
-  if (forced && !orders.some(o => o.supplierId === 'sup-04' && o.createdAt.slice(0, 10) === TODAY && o.id.startsWith('ord-1'))) { forced.overdue = true; forced.daysSinceLast = Math.max(forced.daysSinceLast, 9); forced.avgIntervalDays = 7; }
   const suggestions = topProducts
     .filter(p => supplierFrequency.find(sf => sf.supplierId === p.supplierId)?.overdue)
     .map(p => ({ productName: p.name, suggestedQty: p.avgQty, unit: p.lastUnit, supplierId: p.supplierId, supplierName: p.supplierName, reason: 'usual' }));

@@ -42,6 +42,7 @@ export default function GenerarProposta({ onClose, onApplied }: Props) {
   const [fromDate, setFromDate] = useState(toISODate(nextMonday));
   const [toDate, setToDate] = useState(toISODate(addDays(nextMonday, 6)));
   const [maxDaysPerWeek, setMaxDaysPerWeek] = useState(5);
+  const [respectContract, setRespectContract] = useState(true);
   const [configs, setConfigs] = useState<LocationConfig[] | null>(null);
   const [proposal, setProposal] = useState<ProposedShift[]>([]);
   const [applying, setApplying] = useState(false);
@@ -68,7 +69,9 @@ export default function GenerarProposta({ onClose, onApplied }: Props) {
     const shifts: ProposedShift[] = [];
     const assignedDates: Record<string, Set<string>> = {};
     const daysThisWeek: Record<string, Record<string, number>> = {};
-    available.forEach((e) => { assignedDates[e.id] = new Set(); daysThisWeek[e.id] = {}; });
+    const hoursThisWeek: Record<string, Record<string, number>> = {};
+    available.forEach((e) => { assignedDates[e.id] = new Set(); daysThisWeek[e.id] = {}; hoursThisWeek[e.id] = {}; });
+    const slotHours = (s: ShiftSlot) => { const [a, b] = s.startTime.split(':').map(Number); const [c, d] = s.endTime.split(':').map(Number); return Math.max(0, (c * 60 + d - a * 60 - b) / 60); };
 
     for (const day of periodDays) {
       const dateStr = toISODate(day);
@@ -77,8 +80,10 @@ export default function GenerarProposta({ onClose, onApplied }: Props) {
       for (const cfg of locationConfigs) {
         const loc = locations.data!.find((l) => l.id === cfg.locationId)!;
         for (const slot of cfg.slots) {
+          const need = slotHours(slot);
           const candidates = available
             .filter((e) => !assignedDates[e.id].has(dateStr) && (daysThisWeek[e.id][weekKey] ?? 0) < maxDaysPerWeek)
+            .filter((e) => !respectContract || !e.weeklyHours || (hoursThisWeek[e.id][weekKey] ?? 0) + need <= e.weeklyHours + 0.01)
             .map((e) => {
               const ep = prefs.filter((p) => p.employeeId === e.id && p.dayOfWeek === dow);
               const usual = e.locations?.some((l) => l.locationId === cfg.locationId) ?? false;
@@ -88,8 +93,9 @@ export default function GenerarProposta({ onClose, onApplied }: Props) {
                 if (ep.some((p) => p.locationId === cfg.locationId)) score += 5;
                 if (ep.some((p) => p.startTime <= slot.startTime && p.endTime >= slot.endTime)) score += 3;
               }
-              // Fairness: fewer days assigned so far → slightly higher priority
+              // Fairness: fewer days assigned so far → slightly higher priority; more contract hours left → higher priority
               score -= (daysThisWeek[e.id][weekKey] ?? 0) * 0.5;
+              if (e.weeklyHours) score += ((e.weeklyHours - (hoursThisWeek[e.id][weekKey] ?? 0)) / e.weeklyHours) * 2;
               return { e, score };
             })
             .sort((a, b) => b.score - a.score);
@@ -101,6 +107,7 @@ export default function GenerarProposta({ onClose, onApplied }: Props) {
             } else {
               assignedDates[c.e.id].add(dateStr);
               daysThisWeek[c.e.id][weekKey] = (daysThisWeek[c.e.id][weekKey] ?? 0) + 1;
+              hoursThisWeek[c.e.id][weekKey] = (hoursThisWeek[c.e.id][weekKey] ?? 0) + need;
               shifts.push({ employeeId: c.e.id, employeeName: c.e.name, locationId: cfg.locationId, locationName: loc.name, date: dateStr, startTime: slot.startTime, endTime: slot.endTime });
             }
           }
@@ -166,6 +173,7 @@ export default function GenerarProposta({ onClose, onApplied }: Props) {
                 <Field label={t('proposal.to')}><Input type="date" value={toDate} min={fromDate} onChange={(e) => setToDate(e.target.value)} /></Field>
                 <Field label={t('proposal.maxDays')} hint={t('proposal.maxDaysHint')}><Input type="number" min={1} max={7} value={maxDaysPerWeek} onChange={(e) => setMaxDaysPerWeek(Math.min(7, Math.max(1, Number(e.target.value) || 1)))} /></Field>
               </div>
+              <label className="checkbox"><input type="checkbox" checked={respectContract} onChange={(e) => setRespectContract(e.target.checked)} />{t('proposal.respectContract')}</label>
               {periodDays.length > 0 && (
                 <div className="row-wrap">
                   <Badge tone="brand">{t('proposal.days', { n: periodDays.length })}</Badge>
@@ -193,7 +201,7 @@ export default function GenerarProposta({ onClose, onApplied }: Props) {
                     const ep = prefs.filter((p) => p.employeeId === e.id);
                     return (
                       <div key={e.id} className="row between t-sm" style={{ padding: '4px 0' }}>
-                        <span className="row gap-2"><Avatar name={e.name} id={e.id} size={22} /><span className="t-strong">{e.name}</span></span>
+                        <span className="row gap-2"><Avatar name={e.name} id={e.id} size={22} /><span className="t-strong">{e.name}</span>{e.weeklyHours ? <span className="badge">{e.weeklyHours} h</span> : null}</span>
                         <span className="t-3 t-xs">{ep.length ? ep.map((p) => dayLabelFromCode(p.dayOfWeek)).join(' · ') : t('proposal.noPrefs')}</span>
                       </div>
                     );

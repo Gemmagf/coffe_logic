@@ -34,7 +34,9 @@ export default function Planificacio() {
 
   const sum = cash.data?.summary;
   const forecastTotal = (cash.data?.forecast ?? []).reduce((s, f) => s + f.predicted, 0);
-  const trend = cash.data?.trend ?? [];
+  // Weekly chart: hide the current, still-partial week so the line does not fake a drop.
+  const trendAll = cash.data?.trend ?? [];
+  const trend = trendAll.length > 1 && trendAll[trendAll.length - 1].days < 7 ? trendAll.slice(0, -1) : trendAll;
   const fullWeeks = trend.filter((w) => w.days >= 7);
   const lastTwo = fullWeeks.slice(-2);
   const lastWeek = lastTwo[lastTwo.length - 1];
@@ -70,7 +72,7 @@ export default function Planificacio() {
               </div>
               <div className="grid-auto-lg">
                 <Card>
-                  <CardHead title={t('planning.weeklyTrend')} />
+                  <CardHead title={t('planning.weeklyTrend')} sub={t('planning.fullWeeksOnly')} />
                   {trend.length < 2 ? <EmptyState icon="chart" title={t('planning.noSalesData')} /> : (
                     <>
                       <div className="legend mb-3"><span className="legend-item"><span className="legend-swatch" style={{ background: 'var(--viz-1)' }} />{t('planning.totalSales')}</span><span className="legend-item"><span className="legend-swatch" style={{ background: 'var(--viz-3)' }} />{t('planning.net')}</span></div>
