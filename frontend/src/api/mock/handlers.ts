@@ -12,24 +12,38 @@ import type { ScheduleFilters, SchedulePayload } from '../schedules';
 import type { CashClosingPayload } from '../cashClosings';
 import type { VacationPayload, PreferencePayload } from '../employees';
 import type { CashAnalytics, OrdersAnalytics, StaffingAnalytics } from '../analytics';
-import {
-  LOCATIONS, EMPLOYEES, PREFERENCES, SUPPLIERS,
-  TODAY, addDays, fmt,
-  SCHEDULES as _SCHEDULES,
-  ORDERS as _ORDERS,
-  CASH_CLOSINGS as _CASH_CLOSINGS,
-  VACATIONS as _VACATIONS,
-} from './data';
+import { buildDemoData, fmt, addDays } from './data';
+import { DATASETS, datasetFor, type Profile } from '../../../../shared/demo-dataset';
 
 // ─── Mutable session state ────────────────────────────────────────────────────
+// The dataset is chosen at login and restored from the persisted session on reload.
 
-let locations:    Location[]        = [...LOCATIONS];
-let employees:    Employee[]        = [...EMPLOYEES];
-let suppliers:    Supplier[]        = [...SUPPLIERS];
-let schedules:    Schedule[]        = [..._SCHEDULES];
-let orders:       Order[]           = [..._ORDERS];
-let cashClosings: CashClosing[]     = [..._CASH_CLOSINGS];
-let vacations:    VacationRequest[] = [..._VACATIONS];
+let locations:    Location[]        = [];
+let employees:    Employee[]        = [];
+let suppliers:    Supplier[]        = [];
+let schedules:    Schedule[]        = [];
+let orders:       Order[]           = [];
+let cashClosings: CashClosing[]     = [];
+let vacations:    VacationRequest[] = [];
+let PREFERENCES:  ShiftPreference[] = [];
+let GROUP = { id: DATASETS.mosaik.group.id, name: DATASETS.mosaik.group.name, plan: DATASETS.mosaik.group.plan, createdAt: '2024-01-15T08:00:00Z' };
+const TODAY = fmt(new Date());
+
+export function loadDataset(profile: Profile) {
+  const d = buildDemoData(DATASETS[profile]);
+  locations = d.locations; employees = d.employees; suppliers = d.suppliers; schedules = d.schedules;
+  orders = d.orders; cashClosings = d.cashClosings; vacations = d.vacations; PREFERENCES = d.preferences;
+  GROUP = { ...d.def.group, createdAt: '2024-01-15T08:00:00Z' };
+}
+
+function restoreDataset() {
+  try {
+    const raw = localStorage.getItem('coffe-logic-auth');
+    const groupId = raw ? (JSON.parse(raw)?.state?.user?.groupId as string | undefined) : undefined;
+    loadDataset(datasetFor({ groupId })?.profile ?? 'mosaik');
+  } catch { loadDataset('mosaik'); }
+}
+restoreDataset();
 
 // ─── Helpers ──────────────────────────────────────────────────────────────────
 
@@ -47,18 +61,13 @@ function between(date: string, from?: string, to?: string) {
 
 // ─── Auth ─────────────────────────────────────────────────────────────────────
 
-/** Demo accounts. Usernames are compared ignoring case and spaces, like the real backend. */
-const DEMO_ACCOUNTS: { username: string; email: string; password: string; role: User['role']; id: string }[] = [
-  { id: 'demo-user-001', username: 'thecommercialproject', email: 'owner@mosaik-kaffee.ch',  password: 'Nikos',    role: 'OWNER' },
-  { id: 'demo-user-002', username: 'elena',                email: 'elena@mosaik-kaffee.ch', password: 'demo1234', role: 'MANAGER' },
-];
-const GROUP = { id: 'demo-group-001', name: 'Mosaik Kaffee', plan: 'MULTI' as const, createdAt: '2024-01-15T08:00:00Z' };
-
 export const mockLogin = async (identifier: string, password: string) => {
   await delay(null);
   const key = identifier.trim().toLowerCase().replace(/\s+/g, '');
-  const acc = DEMO_ACCOUNTS.find(a => (key.includes('@') ? a.email === key : a.username === key) && a.password === password);
-  if (!acc) throw new Error('Credencials incorrectes');
+  const ds = datasetFor(key.includes('@') ? { email: key } : { username: key });
+  const acc = ds?.users.find(u => (key.includes('@') ? u.email === key : u.username === key) && u.password === password);
+  if (!ds || !acc) throw new Error('Credencials incorrectes');
+  loadDataset(ds.profile);
   const user: User = { id: acc.id, email: acc.email, role: acc.role, groupId: GROUP.id, group: GROUP, createdAt: TODAY };
   return { token: 'demo-token', user };
 };
@@ -71,7 +80,7 @@ const withCounts = (l: Location): Location => ({
 });
 export const mockGetLocations = (): Promise<Location[]> => delay(locations.map(withCounts));
 export const mockCreateLocation = async (p: LocationPayload): Promise<Location> => {
-  const l: Location = { id: nextId('loc'), name: p.name, address: p.address ?? null, timezone: 'Europe/Zurich', groupId: 'demo-group-001', createdAt: TODAY };
+  const l: Location = { id: nextId('loc'), name: p.name, address: p.address ?? null, timezone: 'Europe/Zurich', groupId: GROUP.id, createdAt: TODAY };
   locations = [...locations, l];
   return delay(withCounts(l));
 };
@@ -95,7 +104,7 @@ export const mockDeleteLocation = async (id: string): Promise<void> => {
 export const mockGetEmployees = (): Promise<Employee[]> => delay([...employees]);
 const empLocations = (ids: string[] = []) => ids.map(locationId => ({ locationId, location: { id: locationId, name: locations.find(l => l.id === locationId)?.name ?? '' } }));
 export const mockCreateEmployee = async (p: EmployeePayload): Promise<Employee> => {
-  const e: Employee = { id: nextId('emp'), name: p.name, email: p.email ?? undefined, phone: p.phone ?? undefined, position: p.position ?? null, weeklyHours: p.weeklyHours ?? null, groupId: 'demo-group-001', createdAt: TODAY, locations: empLocations(p.locationIds) };
+  const e: Employee = { id: nextId('emp'), name: p.name, email: p.email ?? undefined, phone: p.phone ?? undefined, position: p.position ?? null, weeklyHours: p.weeklyHours ?? null, groupId: GROUP.id, createdAt: TODAY, locations: empLocations(p.locationIds) };
   employees = [...employees, e];
   return delay(e);
 };
@@ -117,7 +126,7 @@ export const mockDeleteEmployee = async (id: string): Promise<void> => {
 export const mockGetSuppliers = (): Promise<Supplier[]> =>
   delay(suppliers.map(s => ({ ...s, _count: { orders: orders.filter(o => o.supplierId === s.id).length } })));
 export const mockCreateSupplier = async (p: SupplierPayload): Promise<Supplier> => {
-  const sup: Supplier = { id: nextId('sup'), name: p.name, contact: p.contact ?? null, email: p.email ?? null, phone: p.phone ?? null, groupId: 'demo-group-001' };
+  const sup: Supplier = { id: nextId('sup'), name: p.name, contact: p.contact ?? null, email: p.email ?? null, phone: p.phone ?? null, groupId: GROUP.id };
   suppliers = [...suppliers, sup];
   return delay(sup);
 };

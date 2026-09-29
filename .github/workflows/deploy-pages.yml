@@ -5,6 +5,7 @@ on:
     branches: [main]
     paths:
       - 'frontend/**'
+      - 'shared/**'
       - 'package-lock.json'
       - '.github/workflows/deploy-pages.yml'
   workflow_dispatch:
