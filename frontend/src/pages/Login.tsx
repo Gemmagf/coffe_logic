@@ -1,257 +1,136 @@
-import { useState, FormEvent } from 'react';
-import { useNavigate } from 'react-router-dom';
+import { useState, type FormEvent } from 'react';
+import { useNavigate, useLocation } from 'react-router-dom';
 import { useTranslation } from 'react-i18next';
 import { login } from '../api/auth';
+import { DEMO } from '../api/client';
 import { useAuthStore } from '../store/authStore';
+import { getErrorMessage } from '../lib/errors';
+import Logo from '../components/layout/Logo';
+import LangSwitcher from '../components/layout/LangSwitcher';
+import ThemeToggle from '../components/layout/ThemeToggle';
+import Button from '../components/ui/Button';
+import Icon from '../components/ui/Icon';
+import { Field, Input } from '../components/ui/Field';
 
 const DEMO_EMAIL = 'owner@commercial.ch';
-const DEMO_PASS  = 'demo1234';
+const DEMO_PASS = 'demo1234';
 
 export default function Login() {
   const { t } = useTranslation();
   const navigate = useNavigate();
+  const location = useLocation();
   const setAuth = useAuthStore((s) => s.setAuth);
-  const [email, setEmail]       = useState('');
+  const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
-  const [error, setError]       = useState('');
-  const [loading, setLoading]   = useState(false);
-  const [demoLoading, setDemoLoading] = useState(false);
+  const [showPw, setShowPw] = useState(false);
+  const [error, setError] = useState('');
+  const [busy, setBusy] = useState<'form' | 'demo' | null>(null);
+  const expired = new URLSearchParams(location.search).get('expired') === '1';
 
-  const doLogin = async (e: string, p: string) => {
-    const { token, user } = await login(e, p);
-    setAuth(token, user);
-    navigate('/');
-  };
-
-  const handleSubmit = async (ev: FormEvent) => {
-    ev.preventDefault();
+  const doLogin = async (e: string, p: string, kind: 'form' | 'demo') => {
     setError('');
-    setLoading(true);
+    setBusy(kind);
     try {
-      await doLogin(email, password);
-    } catch (err: unknown) {
-      setError(err instanceof Error ? err.message : 'Error en iniciar sessió');
+      const { token, user } = await login(e, p);
+      setAuth(token, user);
+      navigate('/', { replace: true });
+    } catch (err) {
+      setError(getErrorMessage(err, 'auth.error'));
     } finally {
-      setLoading(false);
+      setBusy(null);
     }
   };
 
-  const handleDemo = async () => {
-    setError('');
-    setDemoLoading(true);
-    try {
-      await doLogin(DEMO_EMAIL, DEMO_PASS);
-    } catch (err: unknown) {
-      setError(err instanceof Error ? err.message : 'Error en accedir a la demo');
-    } finally {
-      setDemoLoading(false);
-    }
-  };
+  const handleSubmit = (ev: FormEvent) => { ev.preventDefault(); void doLogin(email, password, 'form'); };
+
+  const points: { icon: 'calendar' | 'package' | 'chart'; key: string }[] = [
+    { icon: 'calendar', key: 'auth.point1' },
+    { icon: 'package', key: 'auth.point2' },
+    { icon: 'chart', key: 'auth.point3' },
+  ];
 
   return (
-    <div style={styles.container}>
-      <div style={styles.bgAccent} />
-
-      <div style={styles.card}>
-        {/* Logo */}
-        <div style={styles.logoArea}>
-          <div style={styles.logoMark}>C</div>
-          <h1 style={styles.logoText}>Cafgic</h1>
-          <p style={styles.logoSub}>{t('auth.subtitle')}</p>
-        </div>
-
-        {/* Demo button — prominent, above the form */}
-        <button
-          type="button"
-          style={{ ...styles.demoBtn, opacity: demoLoading ? 0.7 : 1 }}
-          onClick={handleDemo}
-          disabled={demoLoading || loading}
-        >
-          {demoLoading ? '...' : t('auth.tryDemo')}
-          {!demoLoading && <span style={styles.demoBadge}>The Commercial Project</span>}
-        </button>
-
-        {/* Divider */}
-        <div style={styles.divider}>
-          <span style={styles.dividerLine} />
-          <span style={styles.dividerText}>o accés amb compte</span>
-          <span style={styles.dividerLine} />
-        </div>
-
-        {/* Login form */}
-        <form onSubmit={handleSubmit} style={styles.form}>
-          <div style={styles.field}>
-            <label style={styles.label}>{t('auth.email')}</label>
-            <input
-              type="email"
-              value={email}
-              onChange={(e) => setEmail(e.target.value)}
-              style={styles.input}
-              placeholder="propietari@local.ch"
-              autoFocus
-            />
+    <div className="auth">
+      <section className="auth-side">
+        <div className="row between">
+          <div className="row gap-3">
+            <Logo size={38} />
+            <div style={{ lineHeight: 1.1 }}>
+              <div style={{ fontSize: 18, fontWeight: 800 }}>Cafgic</div>
+              <div style={{ fontSize: 11, opacity: 0.6, textTransform: 'uppercase', letterSpacing: '0.08em' }}>Massiu Soft</div>
+            </div>
           </div>
-          <div style={styles.field}>
-            <label style={styles.label}>{t('auth.password')}</label>
-            <input
-              type="password"
-              value={password}
-              onChange={(e) => setPassword(e.target.value)}
-              style={styles.input}
-              placeholder="••••••••"
-            />
+          <div className="row gap-2">
+            <LangSwitcher className="mtop-btn" compact />
+            <ThemeToggle className="mtop-btn" />
           </div>
+        </div>
+        <div>
+          <h1 className="auth-headline">
+            {t('auth.headline1')} <em>{t('auth.headline2')}</em>
+          </h1>
+          <div className="auth-points">
+            {points.map((p) => (
+              <div key={p.key} className="auth-point">
+                <span className="auth-point-ic"><Icon name={p.icon} /></span>
+                <span>{t(p.key)}</span>
+              </div>
+            ))}
+          </div>
+        </div>
+        <div style={{ fontSize: 12, opacity: 0.55 }}>© {new Date().getFullYear()} Massiu Soft · {t('auth.subtitle')}</div>
+      </section>
 
-          {error && <p style={styles.error}>{error}</p>}
+      <section className="auth-form">
+        <div className="auth-card">
+          <h2 style={{ fontSize: 24, fontWeight: 800, letterSpacing: '-0.02em' }}>{t('auth.welcome')}</h2>
+          <p className="t-3 mt-2 mb-6" style={{ fontSize: 14 }}>{t('auth.welcomeSub')}</p>
+
+          {expired && !error && <div className="notice notice-warning mb-4"><Icon name="clock" /><span>{t('auth.expired')}</span></div>}
 
           <button
-            type="submit"
-            style={{ ...styles.loginBtn, opacity: loading ? 0.7 : 1 }}
-            disabled={loading || demoLoading || !email || !password}
+            type="button" className="btn btn-accent btn-lg btn-block" style={{ height: 52, flexDirection: 'column', gap: 2 }}
+            onClick={() => doLogin(DEMO_EMAIL, DEMO_PASS, 'demo')} disabled={busy !== null}
           >
-            {loading ? t('auth.loggingIn') : t('auth.login')}
+            {busy === 'demo' ? <span className="spinner" /> : (
+              <>
+                <span className="row gap-2"><Icon name="sparkles" />{t('auth.tryDemo')}</span>
+                <span style={{ fontSize: 10.5, fontWeight: 600, opacity: 0.7, letterSpacing: '0.04em', textTransform: 'uppercase' }}>The Commercial Project · Zürich</span>
+              </>
+            )}
           </button>
-        </form>
-      </div>
+
+          <div className="row gap-3 mt-5 mb-5">
+            <hr className="divider grow" />
+            <span className="t-xs t-4" style={{ whiteSpace: 'nowrap' }}>{t('auth.orAccount')}</span>
+            <hr className="divider grow" />
+          </div>
+
+          <form onSubmit={handleSubmit} className="col gap-4">
+            <Field label={t('auth.email')} htmlFor="email">
+              <Input id="email" type="email" autoComplete="email" value={email} onChange={(e) => setEmail(e.target.value)} placeholder="propietari@local.ch" />
+            </Field>
+            <Field label={t('auth.password')} htmlFor="password">
+              <div style={{ position: 'relative' }}>
+                <Input id="password" type={showPw ? 'text' : 'password'} autoComplete="current-password" value={password} onChange={(e) => setPassword(e.target.value)} placeholder="••••••••" style={{ paddingRight: 40 }} />
+                <button type="button" className="btn btn-ghost btn-icon btn-sm" style={{ position: 'absolute', right: 4, top: 4 }} onClick={() => setShowPw((s) => !s)} aria-label={showPw ? t('auth.hidePassword') : t('auth.showPassword')}>
+                  <Icon name={showPw ? 'eyeOff' : 'eye'} />
+                </button>
+              </div>
+            </Field>
+
+            {error && <div className="error-box" role="alert">{error}</div>}
+
+            <Button type="submit" variant="primary" size="lg" block loading={busy === 'form'} disabled={busy !== null || !email || !password} iconRight="arrowRight">
+              {t('auth.login')}
+            </Button>
+          </form>
+
+          <p className="t-xs t-4 mt-6" style={{ textAlign: 'center' }}>
+            {DEMO ? t('auth.demoModeHint') : t('auth.demoCredentials', { email: DEMO_EMAIL, password: DEMO_PASS })}
+          </p>
+        </div>
+      </section>
     </div>
   );
 }
-
-const styles: Record<string, React.CSSProperties> = {
-  container: {
-    minHeight: '100vh',
-    backgroundColor: '#2D3250',
-    display: 'flex',
-    alignItems: 'center',
-    justifyContent: 'center',
-    padding: 20,
-    position: 'relative',
-    overflow: 'hidden',
-  },
-  bgAccent: {
-    position: 'absolute',
-    top: -120,
-    right: -120,
-    width: 400,
-    height: 400,
-    borderRadius: '50%',
-    backgroundColor: 'rgba(244,226,133,0.08)',
-    pointerEvents: 'none',
-  },
-  card: {
-    backgroundColor: '#fff',
-    borderRadius: 20,
-    padding: '40px 36px 32px',
-    width: '100%',
-    maxWidth: 400,
-    boxShadow: '0 24px 64px rgba(0,0,0,0.22)',
-    position: 'relative',
-    zIndex: 1,
-  },
-  logoArea: {
-    marginBottom: 28,
-    textAlign: 'center',
-    display: 'flex',
-    flexDirection: 'column',
-    alignItems: 'center',
-    gap: 6,
-  },
-  logoMark: {
-    width: 52, height: 52, borderRadius: 14,
-    backgroundColor: '#2D3250', color: '#F4E285',
-    fontSize: 26, fontWeight: 900,
-    display: 'flex', alignItems: 'center', justifyContent: 'center',
-    marginBottom: 4,
-  },
-  logoText: {
-    fontSize: 28, fontWeight: 900, color: '#2D3250',
-    margin: 0, letterSpacing: '-1px',
-  },
-  logoSub: {
-    fontSize: 11, color: '#9CA3AF', margin: 0,
-    textTransform: 'uppercase', letterSpacing: '0.5px',
-  },
-
-  // Demo button
-  demoBtn: {
-    width: '100%',
-    padding: '14px 16px',
-    backgroundColor: '#F4E285',
-    color: '#2D3250',
-    border: 'none',
-    borderRadius: 12,
-    fontSize: 15,
-    fontWeight: 800,
-    cursor: 'pointer',
-    display: 'flex',
-    flexDirection: 'column',
-    alignItems: 'center',
-    gap: 3,
-    transition: 'opacity 0.15s',
-    letterSpacing: '-0.2px',
-  },
-  demoBadge: {
-    fontSize: 10,
-    fontWeight: 600,
-    color: '#6B7280',
-    letterSpacing: '0.3px',
-    textTransform: 'uppercase',
-  },
-
-  // Divider
-  divider: {
-    display: 'flex',
-    alignItems: 'center',
-    gap: 10,
-    margin: '20px 0',
-  },
-  dividerLine: {
-    flex: 1,
-    height: 1,
-    backgroundColor: '#E8E4D9',
-  },
-  dividerText: {
-    fontSize: 11,
-    color: '#C4BFB8',
-    whiteSpace: 'nowrap',
-    flexShrink: 0,
-  },
-
-  // Login form
-  form: {
-    display: 'flex',
-    flexDirection: 'column',
-    gap: 14,
-  },
-  field: { display: 'flex', flexDirection: 'column', gap: 5 },
-  label: {
-    fontSize: 11, fontWeight: 700, color: '#6B7280',
-    textTransform: 'uppercase', letterSpacing: '0.4px',
-  },
-  input: {
-    padding: '10px 13px',
-    borderRadius: 8,
-    border: '1.5px solid #E8E4D9',
-    fontSize: 14,
-    outline: 'none',
-    backgroundColor: '#FAFAF8',
-    color: '#2D3250',
-  },
-  error: {
-    fontSize: 13, color: '#c0392b', margin: 0,
-    padding: '9px 13px', backgroundColor: '#fef2f2',
-    borderRadius: 8, border: '1px solid #fecaca', fontWeight: 500,
-  },
-  loginBtn: {
-    padding: '11px',
-    backgroundColor: '#2D3250',
-    color: '#F4E285',
-    border: 'none',
-    borderRadius: 9,
-    fontSize: 14,
-    fontWeight: 700,
-    cursor: 'pointer',
-    transition: 'opacity 0.15s',
-    letterSpacing: '0.2px',
-  },
-};

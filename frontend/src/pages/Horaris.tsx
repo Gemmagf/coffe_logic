@@ -1,280 +1,234 @@
-import { useEffect, useState } from 'react';
-import { format, addDays, startOfWeek, parseISO } from 'date-fns';
-import { ca } from 'date-fns/locale';
+import { useMemo, useState, useEffect } from 'react';
+import { useSearchParams } from 'react-router-dom';
+import { addDays, startOfWeek, isSameDay } from 'date-fns';
 import { useTranslation } from 'react-i18next';
-import Header from '../components/layout/Header';
-import { getSchedules, createSchedule, deleteSchedule } from '../api/schedules';
-import { getLocations, getEmployees } from '../api/locations';
-import type { Schedule, Location, Employee } from '../types';
+import PageHeader from '../components/ui/PageHeader';
+import Button from '../components/ui/Button';
+import Card, { CardHead } from '../components/ui/Card';
+import Icon from '../components/ui/Icon';
+import Avatar from '../components/ui/Avatar';
+import Badge from '../components/ui/Badge';
+import EmptyState from '../components/ui/EmptyState';
+import { Select } from '../components/ui/Field';
+import { Segmented } from '../components/ui/Tabs';
+import { PageSkeleton } from '../components/ui/Skeleton';
+import { useToast } from '../components/ui/Toast';
+import { useConfirm } from '../components/ui/Confirm';
+import ShiftModal, { type ShiftDraft } from '../components/ShiftModal';
 import GenerarProposta from './GenerarProposta';
+import { useLocations, useEmployees, useSchedules, useScheduleMutations } from '../hooks/queries';
+import { useCanManage } from '../store/authStore';
+import { getSchedules } from '../api/schedules';
+import { toISODate, hoursBetween, fmtHours, fmtNum } from '../lib/format';
+import { fmtDate, weekdayShort } from '../lib/dates';
+import { colorFor } from '../lib/colors';
+import { getErrorMessage } from '../lib/errors';
+import type { Schedule } from '../types';
 
-// Colors subtils per distingir empleats al calendari
-const EMP_COLORS = [
-  { bg: '#EEF2FF', border: '#C7D2FE', text: '#3730A3' },
-  { bg: '#F0FDF4', border: '#BBF7D0', text: '#166534' },
-  { bg: '#FFFBEB', border: '#FDE68A', text: '#92400E' },
-  { bg: '#FDF2F8', border: '#FBCFE8', text: '#9D174D' },
-  { bg: '#F5F3FF', border: '#DDD6FE', text: '#5B21B6' },
-  { bg: '#ECFEFF', border: '#A5F3FC', text: '#164E63' },
-];
-function empColorIdx(name: string) {
-  let hash = 0;
-  for (let i = 0; i < name.length; i++) hash = name.charCodeAt(i) + ((hash << 5) - hash);
-  return EMP_COLORS[Math.abs(hash) % EMP_COLORS.length];
-}
+type View = 'week' | 'people';
 
 export default function Horaris() {
   const { t } = useTranslation();
-  const DAYS = t('schedules.days', { returnObjects: true }) as string[];
+  const toast = useToast();
+  const confirm = useConfirm();
+  const canManage = useCanManage();
+  const [params, setParams] = useSearchParams();
   const [weekStart, setWeekStart] = useState(() => startOfWeek(new Date(), { weekStartsOn: 1 }));
-  const [schedules, setSchedules] = useState<Schedule[]>([]);
-  const [locations, setLocations] = useState<Location[]>([]);
-  const [employees, setEmployees] = useState<Employee[]>([]);
   const [filterLocation, setFilterLocation] = useState('');
-  const [showForm, setShowForm] = useState(false);
-  const [showWizard, setShowWizard] = useState(false);
-  const [loading, setLoading] = useState(true);
+  const [filterEmployee, setFilterEmployee] = useState('');
+  const [view, setView] = useState<View>('week');
+  const [modal, setModal] = useState<{ open: boolean; editing?: Schedule | null; draft?: ShiftDraft | null }>({ open: false });
+  const [wizard, setWizard] = useState(false);
   const [copying, setCopying] = useState(false);
 
-  const [form, setForm] = useState({
-    employeeId: '',
-    locationId: '',
-    date: format(new Date(), 'yyyy-MM-dd'),
-    startTime: '09:00',
-    endTime: '17:00',
-    notes: '',
-  });
-
-  const weekDays = Array.from({ length: 7 }, (_, i) => addDays(weekStart, i));
-
-  const fetchSchedules = () => {
-    const from = format(weekStart, 'yyyy-MM-dd');
-    const to = format(addDays(weekStart, 6), 'yyyy-MM-dd');
-    getSchedules({ from, to, ...(filterLocation ? { locationId: filterLocation } : {}) })
-      .then(setSchedules)
-      .catch(console.error);
-  };
+  const from = toISODate(weekStart);
+  const to = toISODate(addDays(weekStart, 6));
+  const locations = useLocations();
+  const employees = useEmployees();
+  const schedules = useSchedules({ from, to, ...(filterLocation ? { locationId: filterLocation } : {}) });
+  const { create } = useScheduleMutations();
 
   useEffect(() => {
-    Promise.all([getLocations(), getEmployees()])
-      .then(([locs, emps]) => {
-        setLocations(locs);
-        setEmployees(emps);
-      })
-      .finally(() => setLoading(false));
-  }, []);
-
-  useEffect(() => { fetchSchedules(); }, [weekStart, filterLocation]);
-
-  const handleSubmit = async (e: React.FormEvent) => {
-    e.preventDefault();
-    try {
-      await createSchedule({ ...form, notes: form.notes || null });
-      setShowForm(false);
-      setForm({ employeeId: '', locationId: '', date: format(new Date(), 'yyyy-MM-dd'), startTime: '09:00', endTime: '17:00', notes: '' });
-      fetchSchedules();
-    } catch (err) {
-      console.error(err);
+    if (params.get('new') === '1') {
+      setModal({ open: true, draft: { date: toISODate(new Date()) } });
+      params.delete('new'); setParams(params, { replace: true });
     }
-  };
+  }, [params, setParams]);
 
-  const handleCopyPrevWeek = async () => {
+  const weekDays = useMemo(() => Array.from({ length: 7 }, (_, i) => addDays(weekStart, i)), [weekStart]);
+  const all = schedules.data ?? [];
+  const visible = filterEmployee ? all.filter((s) => s.employeeId === filterEmployee) : all;
+  const forDay = (d: Date) => visible.filter((s) => s.date === toISODate(d)).sort((a, b) => a.startTime.localeCompare(b.startTime));
+  const totalHours = visible.reduce((s, x) => s + hoursBetween(x.startTime, x.endTime), 0);
+
+  const perEmployee = useMemo(() => {
+    const map = new Map<string, { id: string; name: string; hours: number; shifts: Schedule[] }>();
+    visible.forEach((s) => {
+      const e = map.get(s.employeeId) ?? { id: s.employeeId, name: s.employee.name, hours: 0, shifts: [] };
+      e.hours += hoursBetween(s.startTime, s.endTime); e.shifts.push(s); map.set(s.employeeId, e);
+    });
+    return [...map.values()].sort((a, b) => b.hours - a.hours);
+  }, [visible]);
+
+  const isCurrentWeek = isSameDay(weekStart, startOfWeek(new Date(), { weekStartsOn: 1 }));
+
+  const copyPrevWeek = async () => {
+    if (!(await confirm({ title: t('schedules.copyPrevWeek'), message: t('schedules.copyConfirm', { week: `${fmtDate(weekStart, 'd MMM')} – ${fmtDate(addDays(weekStart, 6), 'd MMM')}` }) }))) return;
     setCopying(true);
     try {
-      const prevFrom = format(addDays(weekStart, -7), 'yyyy-MM-dd');
-      const prevTo = format(addDays(weekStart, -1), 'yyyy-MM-dd');
-      const prevSchedules = await getSchedules({ from: prevFrom, to: prevTo });
-      let copied = 0;
-      for (const s of prevSchedules) {
+      const prev = await getSchedules({ from: toISODate(addDays(weekStart, -7)), to: toISODate(addDays(weekStart, -1)) });
+      let ok = 0, skipped = 0;
+      for (const s of prev) {
         try {
-          const newDate = format(addDays(parseISO(s.date), 7), 'yyyy-MM-dd');
-          await createSchedule({
-            employeeId: s.employee.id,
-            locationId: s.location.id,
-            date: newDate,
-            startTime: s.startTime,
-            endTime: s.endTime,
-            notes: s.notes ?? null,
-          });
-          copied++;
-        } catch {
-          // skip duplicates or conflicts silently
-        }
+          await create.mutateAsync({ employeeId: s.employeeId, locationId: s.locationId, date: toISODate(addDays(new Date(s.date + 'T00:00:00'), 7)), startTime: s.startTime, endTime: s.endTime, notes: s.notes ?? null });
+          ok++;
+        } catch { skipped++; }
       }
-      if (copied > 0) fetchSchedules();
-    } catch (err) {
-      console.error(err);
-    } finally {
-      setCopying(false);
-    }
+      toast[ok ? 'success' : 'warning'](t('schedules.copyResult', { ok, skipped }));
+    } catch (err) { toast.error(getErrorMessage(err)); }
+    finally { setCopying(false); }
   };
 
-  const handleDelete = async (id: string) => {
-    if (!confirm(t('schedules.deleteConfirm'))) return;
-    await deleteSchedule(id);
-    fetchSchedules();
-  };
+  if (locations.isLoading || employees.isLoading) return <PageSkeleton />;
 
-  const schedulesForDay = (day: Date) =>
-    schedules.filter((s) => format(parseISO(s.date), 'yyyy-MM-dd') === format(day, 'yyyy-MM-dd'));
-
-  if (loading) return <div style={{ padding: 40, color: '#888' }}>{t('common.loading')}</div>;
+  const emptyWeek = all.length === 0 && !schedules.isFetching;
 
   return (
     <div>
-      {showWizard && (
-        <GenerarProposta
-          onClose={() => setShowWizard(false)}
-          onApplied={() => { setShowWizard(false); fetchSchedules(); }}
-        />
-      )}
-      <Header
-        title={t('schedules.title')}
-        subtitle={t('schedules.subtitle')}
-        action={
-          <div style={{ display: 'flex', gap: 8 }}>
-            <button style={styles.secondaryBtn} onClick={() => setShowWizard(true)}>
-              {t('schedules.generateProposal')}
-            </button>
-            <button style={styles.primaryBtn} onClick={() => setShowForm(!showForm)}>
-              {showForm ? t('schedules.cancel') : t('schedules.newShift')}
-            </button>
-          </div>
-        }
-      />
+      <PageHeader title={t('schedules.title')} subtitle={t('schedules.subtitle')}
+        actions={canManage && (
+          <>
+            <Button icon="wand" onClick={() => setWizard(true)}>{t('schedules.generateProposal')}</Button>
+            <Button variant="primary" icon="plus" onClick={() => setModal({ open: true, draft: { date: isCurrentWeek ? toISODate(new Date()) : from } })}>{t('schedules.newShift')}</Button>
+          </>
+        )} />
 
-      {showForm && (
-        <div style={styles.formCard}>
-          <h3 style={styles.formTitle}>{t('schedules.newShiftForm')}</h3>
-          <form onSubmit={handleSubmit} style={styles.formGrid}>
-            <div style={styles.field}>
-              <label style={styles.label}>{t('schedules.employee')}</label>
-              <select style={styles.input} value={form.employeeId} onChange={(e) => setForm({ ...form, employeeId: e.target.value })} required>
-                <option value="">{t('schedules.selectEmployee')}</option>
-                {employees.map((emp) => <option key={emp.id} value={emp.id}>{emp.name}</option>)}
-              </select>
-            </div>
-            <div style={styles.field}>
-              <label style={styles.label}>{t('schedules.location')}</label>
-              <select style={styles.input} value={form.locationId} onChange={(e) => setForm({ ...form, locationId: e.target.value })} required>
-                <option value="">{t('schedules.selectLocation')}</option>
-                {locations.map((loc) => <option key={loc.id} value={loc.id}>{loc.name}</option>)}
-              </select>
-            </div>
-            <div style={styles.field}>
-              <label style={styles.label}>{t('schedules.date')}</label>
-              <input type="date" style={styles.input} value={form.date} onChange={(e) => setForm({ ...form, date: e.target.value })} required />
-            </div>
-            <div style={styles.field}>
-              <label style={styles.label}>{t('schedules.startTime')}</label>
-              <input type="time" style={styles.input} value={form.startTime} onChange={(e) => setForm({ ...form, startTime: e.target.value })} required />
-            </div>
-            <div style={styles.field}>
-              <label style={styles.label}>{t('schedules.endTime')}</label>
-              <input type="time" style={styles.input} value={form.endTime} onChange={(e) => setForm({ ...form, endTime: e.target.value })} required />
-            </div>
-            <div style={styles.field}>
-              <label style={styles.label}>{t('schedules.notes')}</label>
-              <input type="text" style={styles.input} value={form.notes} onChange={(e) => setForm({ ...form, notes: e.target.value })} placeholder={t('schedules.optional')} />
-            </div>
-            <div style={{ gridColumn: '1 / -1' }}>
-              <button type="submit" style={styles.primaryBtn}>{t('schedules.saveShift')}</button>
-            </div>
-          </form>
+      <div className="toolbar">
+        <div className="row" style={{ gap: 4 }}>
+          <Button icon="chevronLeft" variant="secondary" onClick={() => setWeekStart(addDays(weekStart, -7))} aria-label={t('schedules.prevWeek')} />
+          <Button variant="secondary" onClick={() => setWeekStart(startOfWeek(new Date(), { weekStartsOn: 1 }))} disabled={isCurrentWeek}>{t('schedules.today')}</Button>
+          <Button icon="chevronRight" variant="secondary" onClick={() => setWeekStart(addDays(weekStart, 7))} aria-label={t('schedules.nextWeek')} />
         </div>
-      )}
-
-      <div style={styles.controls}>
-        <div style={styles.weekNav}>
-          <button style={styles.navBtn} onClick={() => setWeekStart(addDays(weekStart, -7))}>←</button>
-          <span style={styles.weekLabel}>
-            {format(weekStart, 'd MMM', { locale: ca })} – {format(addDays(weekStart, 6), 'd MMM yyyy', { locale: ca })}
-          </span>
-          <button style={styles.navBtn} onClick={() => setWeekStart(addDays(weekStart, 7))}>→</button>
-          <button
-            style={{ ...styles.copyBtn, opacity: copying ? 0.6 : 1 }}
-            onClick={handleCopyPrevWeek}
-            disabled={copying}
-          >
-            {copying ? t('schedules.copying') : t('schedules.copyPrevWeek')}
-          </button>
-        </div>
-        <select
-          style={styles.filterSelect}
-          value={filterLocation}
-          onChange={(e) => setFilterLocation(e.target.value)}
-        >
+        <span className="t-strong" style={{ fontSize: 15 }}>{fmtDate(weekStart, 'd MMM')} – {fmtDate(addDays(weekStart, 6), 'd MMM yyyy')}</span>
+        <span className="badge">{t('schedules.weekNo', { n: fmtDate(weekStart, 'I') })}</span>
+        <div className="grow" />
+        <Select small value={filterLocation} onChange={(e) => setFilterLocation(e.target.value)}>
           <option value="">{t('schedules.allLocations')}</option>
-          {locations.map((loc) => <option key={loc.id} value={loc.id}>{loc.name}</option>)}
-        </select>
+          {locations.data?.map((l) => <option key={l.id} value={l.id}>{l.name}</option>)}
+        </Select>
+        <Select small value={filterEmployee} onChange={(e) => setFilterEmployee(e.target.value)}>
+          <option value="">{t('employees.allEmployees')}</option>
+          {employees.data?.map((e) => <option key={e.id} value={e.id}>{e.name}</option>)}
+        </Select>
+        <Segmented value={view} onChange={setView} items={[{ key: 'week', label: <span className="row gap-2"><Icon name="grid" size={13} />{t('schedules.viewWeek')}</span> }, { key: 'people', label: <span className="row gap-2"><Icon name="users" size={13} />{t('schedules.viewPeople')}</span> }]} />
+        {canManage && <Button size="sm" variant="ghost" icon="copy" loading={copying} onClick={copyPrevWeek}>{t('schedules.copyPrevWeek')}</Button>}
       </div>
 
-      <div style={{ overflowX: 'auto', WebkitOverflowScrolling: 'touch' as never, marginLeft: -2, marginRight: -2 }}>
-      <div style={{ ...styles.weekGrid, minWidth: 560 }}>
-        {weekDays.map((day, i) => {
-          const daySchedules = schedulesForDay(day);
-          const isToday = format(day, 'yyyy-MM-dd') === format(new Date(), 'yyyy-MM-dd');
-          return (
-            <div key={i} style={{ ...styles.dayCol, ...(isToday ? styles.dayColToday : {}) }}>
-              <div style={styles.dayHeader}>
-                <span style={styles.dayName}>{DAYS[i]}</span>
-                <span style={{ ...styles.dayNum, ...(isToday ? styles.dayNumToday : {}) }}>
-                  {format(day, 'd')}
-                </span>
-              </div>
-              <div style={styles.dayBody}>
-                {daySchedules.length === 0 ? (
-                  <span style={styles.noShifts}>—</span>
-                ) : (
-                  daySchedules.map((s) => {
-                    const c = empColorIdx(s.employee.name);
-                    return (
-                      <div key={s.id} style={{ ...styles.shiftChip, backgroundColor: c.bg, borderColor: c.border }}>
-                        <span style={{ ...styles.shiftName, color: c.text }}>{s.employee.name.split(' ')[0]}</span>
-                        <span style={styles.shiftTime}>{s.startTime}–{s.endTime}</span>
-                        <span style={styles.shiftLoc}>{s.location.name.replace('The Commercial – ', '')}</span>
-                        <button style={styles.deleteBtn} onClick={() => handleDelete(s.id)}>×</button>
+      <div className="row-wrap mb-4 t-sm t-3">
+        <span><b className="t-2">{fmtNum(visible.length)}</b> {t('schedules.shiftsLabel')}</span>
+        <span>·</span>
+        <span><b className="t-2">{fmtHours(totalHours)}</b> {t('schedules.plannedLabel')}</span>
+        <span>·</span>
+        <span><b className="t-2">{perEmployee.length}</b> {t('schedules.peopleLabel')}</span>
+        {schedules.isFetching && <span className="spinner" style={{ width: 12, height: 12 }} />}
+      </div>
+
+      {emptyWeek && (
+        <Card className="mb-5">
+          <EmptyState icon="calendar" title={t('schedules.emptyWeek')} description={t('schedules.emptyWeekDesc')}
+            action={canManage && <div className="row gap-2"><Button icon="copy" onClick={copyPrevWeek} loading={copying}>{t('schedules.copyPrevWeek')}</Button><Button variant="primary" icon="wand" onClick={() => setWizard(true)}>{t('schedules.generateProposal')}</Button></div>} />
+        </Card>
+      )}
+
+      {view === 'week' ? (
+        <div className="week-wrap">
+          <div className="week">
+            {weekDays.map((day, i) => {
+              const items = forDay(day);
+              const today = isSameDay(day, new Date());
+              const hours = items.reduce((s, x) => s + hoursBetween(x.startTime, x.endTime), 0);
+              return (
+                <div key={i} className={`day${today ? ' day-today' : ''}`}>
+                  <div className="day-head">
+                    <span className="day-name">{weekdayShort(i)}</span>
+                    <span className="day-num">{fmtDate(day, 'd')}</span>
+                  </div>
+                  <div className="day-body">
+                    {items.map((s) => (
+                      <div key={s.id} className="shift" style={{ ['--shift-color' as string]: colorFor(s.employeeId) }} onClick={() => canManage && setModal({ open: true, editing: s })} role={canManage ? 'button' : undefined}>
+                        <span className="shift-name">{s.employee.name}</span>
+                        <span className="shift-time">{s.startTime}–{s.endTime}</span>
+                        {!filterLocation && <span className="shift-loc">{s.location.name}</span>}
+                        {s.notes && <span className="shift-loc" title={s.notes}>✎ {s.notes}</span>}
                       </div>
-                    );
-                  })
-                )}
+                    ))}
+                    {canManage && (
+                      <button className="day-add" onClick={() => setModal({ open: true, draft: { date: toISODate(day), locationId: filterLocation || undefined, employeeId: filterEmployee || undefined } })}>
+                        <Icon name="plus" />{t('schedules.add')}
+                      </button>
+                    )}
+                  </div>
+                  <div className="day-foot"><span>{items.length} {t('schedules.shiftsShort')}</span><span>{fmtHours(hours)}</span></div>
+                </div>
+              );
+            })}
+          </div>
+        </div>
+      ) : (
+        <Card pad="none">
+          <div className="table-wrap" style={{ border: 0 }}>
+            <table className="table">
+              <thead>
+                <tr>
+                  <th>{t('schedules.employee')}</th>
+                  {weekDays.map((d, i) => <th key={i} style={{ textAlign: 'center', minWidth: 92 }}>{weekdayShort(i)} <span className="t-4">{fmtDate(d, 'd')}</span></th>)}
+                  <th className="num">{t('schedules.hours')}</th>
+                </tr>
+              </thead>
+              <tbody>
+                {perEmployee.length === 0 && <tr><td colSpan={9}><EmptyState icon="users" title={t('schedules.emptyWeek')} /></td></tr>}
+                {perEmployee.map((e) => (
+                  <tr key={e.id}>
+                    <td><span className="row gap-3"><Avatar name={e.name} id={e.id} size={26} /><span className="t-strong">{e.name}</span></span></td>
+                    {weekDays.map((d, i) => {
+                      const items = e.shifts.filter((s) => s.date === toISODate(d));
+                      return (
+                        <td key={i} style={{ textAlign: 'center' }}>
+                          <div className="col" style={{ gap: 3, alignItems: 'center' }}>
+                            {items.map((s) => (
+                              <button key={s.id} className="chip chip-btn" style={{ background: `color-mix(in srgb, ${colorFor(e.id)} 14%, var(--surface))`, height: 24, fontSize: 11 }} onClick={() => canManage && setModal({ open: true, editing: s })} title={s.location.name}>
+                                {s.startTime}–{s.endTime}
+                              </button>
+                            ))}
+                          </div>
+                        </td>
+                      );
+                    })}
+                    <td className="num t-strong">{fmtHours(e.hours)}</td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        </Card>
+      )}
+
+      {perEmployee.length > 0 && view === 'week' && (
+        <Card className="mt-5">
+          <CardHead title={t('schedules.hoursByEmployee')} sub={t('schedules.hoursByEmployeeSub')} />
+          <div className="grid-auto" style={{ gap: 10 }}>
+            {perEmployee.map((e) => (
+              <div key={e.id} className="row between" style={{ padding: '8px 10px', borderRadius: 10, background: 'var(--surface-2)' }}>
+                <span className="row gap-3 t-truncate"><Avatar name={e.name} id={e.id} size={26} /><span className="t-sm t-strong t-truncate">{e.name}</span></span>
+                <span className="row gap-2"><Badge>{e.shifts.length} {t('schedules.shiftsShort')}</Badge><span className="t-sm t-strong t-num">{fmtHours(e.hours)}</span></span>
               </div>
-            </div>
-          );
-        })}
-      </div>
-      </div>
+            ))}
+          </div>
+        </Card>
+      )}
+
+      <ShiftModal open={modal.open} onClose={() => setModal({ open: false })} employees={employees.data ?? []} locations={locations.data ?? []} editing={modal.editing} draft={modal.draft} />
+      {wizard && <GenerarProposta onClose={() => setWizard(false)} onApplied={() => setWizard(false)} />}
     </div>
   );
 }
-
-const styles: Record<string, React.CSSProperties> = {
-  primaryBtn: { padding: '8px 16px', backgroundColor: '#2D3250', color: '#F4E285', border: 'none', borderRadius: 7, fontSize: 13, fontWeight: 600, cursor: 'pointer' },
-  secondaryBtn: { padding: '8px 16px', backgroundColor: '#fff', color: '#2D3250', border: '1.5px solid #E8E4D9', borderRadius: 7, fontSize: 13, fontWeight: 600, cursor: 'pointer' },
-  formCard: { backgroundColor: '#fff', borderRadius: 12, padding: '20px 24px', marginBottom: 24, boxShadow: '0 1px 6px rgba(45,50,80,0.07)' },
-  formTitle: { fontSize: 14, fontWeight: 700, margin: '0 0 16px', color: '#2D3250' },
-  formGrid: { display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(180px, 1fr))', gap: 14 },
-  field: { display: 'flex', flexDirection: 'column', gap: 4 },
-  label: { fontSize: 12, fontWeight: 600, color: '#6B7280' },
-  input: { padding: '8px 10px', border: '1.5px solid #E8E4D9', borderRadius: 6, fontSize: 13, outline: 'none', backgroundColor: '#faf9f7' },
-  controls: { display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 16, flexWrap: 'wrap', gap: 12 },
-  weekNav: { display: 'flex', alignItems: 'center', gap: 12 },
-  navBtn: { padding: '7px 14px', border: '1.5px solid #E8E4D9', borderRadius: 8, background: '#fff', cursor: 'pointer', fontSize: 15, fontWeight: 600, color: '#2D3250' },
-  weekLabel: { fontSize: 14, fontWeight: 700, color: '#2D3250', minWidth: 170, textAlign: 'center' as const },
-  copyBtn: { padding: '7px 13px', border: '1.5px solid #E8E4D9', borderRadius: 8, background: '#F5F3EC', cursor: 'pointer', fontSize: 12, fontWeight: 600, color: '#6B7280', whiteSpace: 'nowrap' as const },
-  filterSelect: { padding: '7px 10px', border: '1.5px solid #E8E4D9', borderRadius: 6, fontSize: 13, outline: 'none', backgroundColor: '#fff' },
-  weekGrid: { display: 'grid', gridTemplateColumns: 'repeat(7, 1fr)', gap: 8 },
-  dayCol: { backgroundColor: '#fff', borderRadius: 12, overflow: 'hidden', boxShadow: '0 1px 4px rgba(45,50,80,0.06)' },
-  dayColToday: { boxShadow: '0 0 0 2px #F4E285' },
-  dayHeader: { padding: '10px 8px 8px', display: 'flex', flexDirection: 'column', alignItems: 'center', borderBottom: '1px solid #F5F3EC' },
-  dayName: { fontSize: 10, textTransform: 'uppercase' as const, color: '#aaa', letterSpacing: '0.5px', fontWeight: 700 },
-  dayNum: { fontSize: 20, fontWeight: 800, color: '#2D3250', marginTop: 2 },
-  dayNumToday: { color: '#2D3250', backgroundColor: '#F4E285', borderRadius: '50%', width: 30, height: 30, display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 14, fontWeight: 800 },
-  dayBody: { padding: '6px', display: 'flex', flexDirection: 'column', gap: 5, minHeight: 80 },
-  noShifts: { fontSize: 12, color: '#ddd', textAlign: 'center' as const, marginTop: 12 },
-  shiftChip: { borderRadius: 6, padding: '5px 8px', display: 'flex', flexDirection: 'column', gap: 2, position: 'relative' as const, borderWidth: 1, borderStyle: 'solid' },
-  shiftName: { fontSize: 11, fontWeight: 600 },
-  shiftTime: { fontSize: 10, fontWeight: 600 },
-  shiftLoc: { fontSize: 10, color: '#9CA3AF' },
-  deleteBtn: { position: 'absolute' as const, top: 3, right: 4, background: 'transparent', border: 'none', color: '#D1D5DB', cursor: 'pointer', fontSize: 13, lineHeight: 1, padding: 0 },
-};

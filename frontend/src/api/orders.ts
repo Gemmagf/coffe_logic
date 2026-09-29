@@ -1,8 +1,6 @@
-import client from './client';
+import client, { DEMO } from './client';
 import type { ApiResponse, Order, OrderItem, OrderStatus } from '../types';
 import { mockGetOrders, mockCreateOrder, mockUpdateOrderStatus, mockDeleteOrder } from './mock/handlers';
-
-const DEMO = import.meta.env.VITE_DEMO_MODE === 'true';
 
 export interface OrderPayload {
   supplierId: string;

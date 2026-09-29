@@ -1,18 +1,36 @@
-import client from './client';
+import client, { DEMO } from './client';
 import type { ApiResponse, Employee, VacationRequest, ShiftPreference } from '../types';
 import {
-  mockGetEmployees, mockGetVacations, mockCreateVacation, mockUpdateVacationStatus, mockDeleteVacation,
+  mockGetEmployees, mockCreateEmployee, mockUpdateEmployee, mockDeleteEmployee,
+  mockGetVacations, mockCreateVacation, mockUpdateVacationStatus, mockDeleteVacation,
   mockGetPreferences, mockSavePreference, mockDeletePreference,
 } from './mock/handlers';
 
-const DEMO = import.meta.env.VITE_DEMO_MODE === 'true';
-
 // ─── Empleats ─────────────────────────────────────────────────────────────────
+
+export interface EmployeePayload { name: string; email?: string | null; phone?: string | null; locationIds?: string[] }
 
 export const getEmployees = async (): Promise<Employee[]> => {
   if (DEMO) return mockGetEmployees();
   const { data } = await client.get<ApiResponse<Employee[]>>('/employees');
   return data.data;
+};
+
+export const createEmployee = async (payload: EmployeePayload): Promise<Employee> => {
+  if (DEMO) return mockCreateEmployee(payload);
+  const { data } = await client.post<ApiResponse<Employee>>('/employees', { ...payload, email: payload.email || null, phone: payload.phone || null });
+  return data.data;
+};
+
+export const updateEmployee = async (id: string, payload: Partial<EmployeePayload>): Promise<Employee> => {
+  if (DEMO) return mockUpdateEmployee(id, payload);
+  const { data } = await client.patch<ApiResponse<Employee>>(`/employees/${id}`, { ...payload, email: payload.email || null, phone: payload.phone || null });
+  return data.data;
+};
+
+export const deleteEmployee = async (id: string): Promise<void> => {
+  if (DEMO) return mockDeleteEmployee(id);
+  await client.delete(`/employees/${id}`);
 };
 
 // ─── Vacances ─────────────────────────────────────────────────────────────────

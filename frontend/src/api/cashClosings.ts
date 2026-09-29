@@ -1,8 +1,6 @@
-import client from './client';
+import client, { DEMO } from './client';
 import type { ApiResponse, CashClosing } from '../types';
 import { mockGetCashClosings, mockCreateCashClosing, mockUpdateCashClosing, mockDeleteCashClosing } from './mock/handlers';
-
-const DEMO = import.meta.env.VITE_DEMO_MODE === 'true';
 
 export interface CashClosingPayload {
   locationId: string;

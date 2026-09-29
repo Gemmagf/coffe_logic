@@ -1,370 +1,226 @@
-import { useEffect, useState } from 'react';
-import { format } from 'date-fns';
+import { useEffect, useMemo, useState } from 'react';
+import { useSearchParams } from 'react-router-dom';
 import { useTranslation } from 'react-i18next';
-import Header from '../components/layout/Header';
-import { getCashClosings, createCashClosing } from '../api/cashClosings';
-import { getCashAnalytics, type CashAnalytics } from '../api/analytics';
-import { getLocations } from '../api/locations';
-import type { CashClosing, Location } from '../types';
+import { addDays } from 'date-fns';
+import PageHeader from '../components/ui/PageHeader';
+import Button from '../components/ui/Button';
+import Card, { CardHead } from '../components/ui/Card';
+import Badge from '../components/ui/Badge';
+import Icon from '../components/ui/Icon';
+import Modal from '../components/ui/Modal';
+import StatCard from '../components/ui/StatCard';
+import EmptyState from '../components/ui/EmptyState';
+import { Field, Input, Select, Textarea } from '../components/ui/Field';
+import { PageSkeleton } from '../components/ui/Skeleton';
+import { useToast } from '../components/ui/Toast';
+import { useConfirm } from '../components/ui/Confirm';
+import LineChart from '../components/charts/LineChart';
+import BarChart from '../components/charts/BarChart';
+import { useLocations, useCashClosings, useCashAnalytics, useClosingMutations } from '../hooks/queries';
+import { useAuthStore, useCanManage } from '../store/authStore';
+import { getErrorMessage } from '../lib/errors';
+import { fmtCHF, fmtNum, todayISO, toISODate } from '../lib/format';
+import { fmtDate, dayLabelFromCode } from '../lib/dates';
+import type { CashClosing } from '../types';
 
-// ─── Mini Bar Chart (CSS) ─────────────────────────────────────────────────────
-
-function BarChart({
-  data,
-  valueKey,
-  labelKey,
-  color = '#4f7bdb',
-  unit = 'CHF',
-}: {
-  data: Record<string, unknown>[];
-  valueKey: string;
-  labelKey: string;
-  color?: string;
-  unit?: string;
-}) {
-  const vals = data.map((d) => Number(d[valueKey]));
-  const maxVal = Math.max(...vals, 1);
-  return (
-    <div style={{ display: 'flex', alignItems: 'flex-end', gap: 5, height: 100, paddingTop: 8 }}>
-      {data.map((d, i) => (
-        <div key={i} style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', flex: 1, gap: 2 }}>
-          <span style={{ fontSize: 8, color: '#aaa', whiteSpace: 'nowrap' }}>
-            {unit} {vals[i].toLocaleString()}
-          </span>
-          <div style={{ width: '60%', height: Math.max(4, (vals[i] / maxVal) * 75), backgroundColor: color, borderRadius: '3px 3px 0 0' }} />
-          <span style={{ fontSize: 8, color: '#bbb', whiteSpace: 'nowrap' }}>{String(d[labelKey])}</span>
-        </div>
-      ))}
-    </div>
-  );
+/** Expected drawer = opening + cash sales − expenses. Legacy rows without a cash split fall back to total sales. */
+export function cashDifference(c: { openingAmount: number | string; closingAmount: number | string; sales: number | string; cashSales?: number | string; expenses: number | string }) {
+  const cash = Number(c.cashSales ?? 0) > 0 ? Number(c.cashSales) : Number(c.sales);
+  return Number(c.closingAmount) - (Number(c.openingAmount) + cash - Number(c.expenses));
 }
 
-// ─── Main Page ────────────────────────────────────────────────────────────────
+const emptyForm = () => ({ locationId: '', date: todayISO(), openingAmount: 200, closingAmount: 0, cardSales: 0, cashSales: 0, expenses: 0, notes: '' });
 
 export default function Caixa() {
   const { t } = useTranslation();
-  const [closings, setClosings] = useState<CashClosing[]>([]);
-  const [locations, setLocations] = useState<Location[]>([]);
+  const toast = useToast();
+  const confirm = useConfirm();
+  const canManage = useCanManage();
+  const isOwner = useAuthStore((s) => s.user?.role === 'OWNER');
+  const [params, setParams] = useSearchParams();
   const [filterLocation, setFilterLocation] = useState('');
-  const [showForm, setShowForm] = useState(false);
-  const [loading, setLoading] = useState(true);
-  const [submitError, setSubmitError] = useState('');
-  const [analytics, setAnalytics] = useState<CashAnalytics | null>(null);
-  const [showAnalytics, setShowAnalytics] = useState(false);
-
-  const emptyForm = () => ({
-    locationId: '',
-    date: format(new Date(), 'yyyy-MM-dd'),
-    openingAmount: 0,
-    closingAmount: 0,
-    sales: 0,
-    cardSales: 0,
-    cashSales: 0,
-    expenses: 0,
-    notes: '',
-  });
-
+  const [range, setRange] = useState<'14' | '30' | '90' | 'all'>('30');
+  const [modal, setModal] = useState<{ open: boolean; editing?: CashClosing | null }>({ open: false });
   const [form, setForm] = useState(emptyForm());
+  const [formError, setFormError] = useState('');
 
-  const fetchClosings = () => {
-    getCashClosings({ ...(filterLocation ? { locationId: filterLocation } : {}) })
-      .then(setClosings)
-      .catch(console.error);
-  };
+  const from = range === 'all' ? undefined : toISODate(addDays(new Date(), -(Number(range) - 1)));
+  const locations = useLocations();
+  const closings = useCashClosings({ ...(filterLocation ? { locationId: filterLocation } : {}), ...(from ? { from } : {}) });
+  const analytics = useCashAnalytics(filterLocation || undefined);
+  const { create, update, remove } = useClosingMutations();
 
   useEffect(() => {
-    Promise.all([
-      getLocations(),
-      getCashAnalytics(),
-    ])
-      .then(([locs, anal]) => {
-        setLocations(locs);
-        setAnalytics(anal);
-      })
-      .finally(() => setLoading(false));
-  }, []);
+    if (params.get('new') === '1') { openNew(); params.delete('new'); setParams(params, { replace: true }); }
+  }, [params]); // eslint-disable-line react-hooks/exhaustive-deps
 
-  useEffect(() => { fetchClosings(); }, [filterLocation]);
+  const rows = closings.data ?? [];
+  const totals = useMemo(() => {
+    const sales = rows.reduce((s, c) => s + Number(c.sales), 0);
+    const card = rows.reduce((s, c) => s + Number(c.cardSales), 0);
+    const expenses = rows.reduce((s, c) => s + Number(c.expenses), 0);
+    const diff = rows.reduce((s, c) => s + cashDifference(c), 0);
+    const days = new Set(rows.map((c) => c.date)).size;
+    return { sales, card, expenses, diff, days, avg: days ? sales / days : 0, cardShare: sales ? (card / sales) * 100 : 0 };
+  }, [rows]);
 
-  const handleSubmit = async (e: React.FormEvent) => {
-    e.preventDefault();
-    setSubmitError('');
-    try {
-      await createCashClosing(form);
-      setShowForm(false);
-      setForm(emptyForm());
-      fetchClosings();
-      // Refresca analytics
-      getCashAnalytics(filterLocation || undefined).then(setAnalytics);
-    } catch (err: unknown) {
-      const msg = err instanceof Error ? err.message : 'Error en guardar el tancament';
-      setSubmitError(msg);
-    }
+  const daily = useMemo(() => {
+    const m: Record<string, { date: string; sales: number; expenses: number }> = {};
+    rows.forEach((c) => { const d = (m[c.date] ??= { date: c.date, sales: 0, expenses: 0 }); d.sales += Number(c.sales); d.expenses += Number(c.expenses); });
+    return Object.values(m).sort((a, b) => a.date.localeCompare(b.date));
+  }, [rows]);
+
+  const openNew = (editing?: CashClosing) => {
+    setFormError('');
+    setForm(editing ? { locationId: editing.locationId, date: editing.date, openingAmount: Number(editing.openingAmount), closingAmount: Number(editing.closingAmount), cardSales: Number(editing.cardSales), cashSales: Number(editing.cashSales), expenses: Number(editing.expenses), notes: editing.notes ?? '' }
+      : { ...emptyForm(), locationId: filterLocation || (locations.data?.length === 1 ? locations.data[0].id : '') });
+    setModal({ open: true, editing });
   };
 
-  const numField = (key: keyof typeof form, label: string) => (
-    <div style={styles.field}>
-      <label style={styles.label}>{label}</label>
-      <div style={styles.inputWrapper}>
-        <span style={styles.currency}>CHF</span>
-        <input
-          type="number"
-          step="0.01"
-          min="0"
-          style={styles.inputCurrency}
-          value={(form[key] as number)}
-          onChange={(e) => setForm({ ...form, [key]: parseFloat(e.target.value) || 0 })}
-          required
-        />
-      </div>
-    </div>
+  const sales = form.cardSales + form.cashSales;
+  const expected = form.openingAmount + form.cashSales - form.expenses;
+  const liveDiff = form.closingAmount - expected;
+
+  const submit = async (e: React.FormEvent) => {
+    e.preventDefault(); setFormError('');
+    try {
+      const p = { ...form, sales, notes: form.notes || null };
+      if (modal.editing) await update.mutateAsync({ id: modal.editing.id, p }); else await create.mutateAsync(p);
+      toast.success(t(modal.editing ? 'cash.updated' : 'cash.saved'));
+      setModal({ open: false });
+    } catch (err) { setFormError(getErrorMessage(err)); }
+  };
+  const del = async (c: CashClosing) => {
+    if (!(await confirm({ title: t('cash.deleteConfirm'), message: `${c.location.name} · ${fmtDate(c.date)}`, danger: true, confirmLabel: t('common.delete') }))) return;
+    try { await remove.mutateAsync(c.id); toast.success(t('cash.deleted')); } catch (err) { toast.error(getErrorMessage(err)); }
+  };
+
+  const num = (key: 'openingAmount' | 'closingAmount' | 'cardSales' | 'cashSales' | 'expenses', label: string, hint?: string) => (
+    <Field label={label} hint={hint} required>
+      <Input type="number" step="0.05" min="0" addon="CHF" value={form[key]} onChange={(e) => setForm({ ...form, [key]: parseFloat(e.target.value) || 0 })} onFocus={(e) => e.target.select()} required />
+    </Field>
   );
 
-  const difference = (c: CashClosing) =>
-    Number(c.closingAmount) - Number(c.openingAmount) - Number(c.sales) + Number(c.expenses);
+  if (locations.isLoading || closings.isLoading) return <PageSkeleton />;
 
-  if (loading) return <div style={{ padding: 40, color: '#888' }}>{t('common.loading')}</div>;
+  const sum = analytics.data?.summary;
 
   return (
     <div>
-      <Header
-        title={t('cash.title')}
-        subtitle={t('cash.subtitle')}
-        action={
-          <div style={{ display: 'flex', gap: 10 }}>
-            {analytics?.summary && (
-              <button
-                style={{ ...styles.analyticsBtn, ...(showAnalytics ? styles.analyticsBtnActive : {}) }}
-                onClick={() => setShowAnalytics(!showAnalytics)}
-              >
-                {t('cash.trends')}
-              </button>
-            )}
-            <button style={styles.primaryBtn} onClick={() => setShowForm(!showForm)}>
-              {showForm ? t('cash.cancel') : t('cash.newClosing')}
-            </button>
-          </div>
-        }
-      />
+      <PageHeader title={t('cash.title')} subtitle={t('cash.subtitle')}
+        actions={canManage && <Button variant="primary" icon="plus" onClick={() => openNew()}>{t('cash.newClosing')}</Button>} />
 
-      {/* ── Panell d'anàlisi ─────────────────────────────────────────────── */}
-      {showAnalytics && analytics?.summary && (
-        <div style={styles.analyticsPanel}>
-          <div style={styles.analyticsPanelHead}>
-            <span style={styles.analyticsPanelTitle}>{t('cash.salesAnalysis')}</span>
-            <span style={styles.analyticsPanelSub}>{t('cash.basedOn', { n: analytics.summary.totalClosings })}</span>
-          </div>
-
-          {/* KPIs ràpids */}
-          <div style={styles.kpiRow}>
-            <div style={styles.kpi}>
-              <span style={styles.kpiLabel}>{t('cash.totalSales')}</span>
-              <span style={styles.kpiVal}>CHF {analytics.summary.totalSales.toLocaleString()}</span>
-            </div>
-            <div style={styles.kpi}>
-              <span style={styles.kpiLabel}>{t('cash.dailyAvg')}</span>
-              <span style={styles.kpiVal}>CHF {analytics.summary.avgDailySales.toLocaleString()}</span>
-            </div>
-            <div style={styles.kpi}>
-              <span style={styles.kpiLabel}>{t('cash.bestDay')}</span>
-              <span style={{ ...styles.kpiVal, color: '#5aab7a' }}>{analytics.summary.bestDay.label}</span>
-              <span style={styles.kpiSub}>{t('cash.avgOf', { n: analytics.summary.bestDay.avg.toLocaleString() })}</span>
-            </div>
-            <div style={styles.kpi}>
-              <span style={styles.kpiLabel}>{t('cash.worstDay')}</span>
-              <span style={{ ...styles.kpiVal, color: '#E8A838' }}>{analytics.summary.worstDay.label}</span>
-              <span style={styles.kpiSub}>{t('cash.avgOf', { n: analytics.summary.worstDay.avg.toLocaleString() })}</span>
-            </div>
-          </div>
-
-          <div style={styles.chartsRow}>
-            {/* Tendència setmanal */}
-            {analytics.trend.length > 0 && (
-              <div style={styles.chartCard}>
-                <span style={styles.chartTitle}>{t('cash.weeklyTrend')}</span>
-                <BarChart
-                  data={analytics.trend as unknown as Record<string, unknown>[]}
-                  valueKey="sales"
-                  labelKey="week"
-                  color="#4f7bdb"
-                />
-              </div>
-            )}
-
-            {/* Per dia de la setmana */}
-            {analytics.byDayOfWeek.length > 0 && (
-              <div style={styles.chartCard}>
-                <span style={styles.chartTitle}>{t('cash.avgPerDay')}</span>
-                <BarChart
-                  data={analytics.byDayOfWeek as unknown as Record<string, unknown>[]}
-                  valueKey="avg"
-                  labelKey="label"
-                  color="#F4E285"
-                />
-              </div>
-            )}
-
-            {/* Previsió propera setmana */}
-            <div style={styles.chartCard}>
-              <span style={styles.chartTitle}>{t('cash.forecast7')}</span>
-              {analytics.forecast.every((f) => f.predicted === 0) ? (
-                <p style={{ fontSize: 11, color: '#bbb', marginTop: 8 }}>{t('cash.noHistory')}</p>
-              ) : (
-                <div style={{ marginTop: 8 }}>
-                  {analytics.forecast.map((f) => (
-                    <div key={f.date} style={styles.forecastRow}>
-                      <span style={styles.forecastDate}>{f.date.slice(5)} <span style={{ color: '#bbb' }}>{f.label}</span></span>
-                      <span style={styles.forecastVal}>CHF {f.predicted.toLocaleString()}</span>
-                    </div>
-                  ))}
-                </div>
-              )}
-            </div>
-          </div>
-        </div>
-      )}
-
-      {/* ── Formulari nou tancament ──────────────────────────────────────── */}
-      {showForm && (
-        <div style={styles.formCard}>
-          <h3 style={styles.formTitle}>{t('cash.closingDay')}</h3>
-          <form onSubmit={handleSubmit}>
-            <div style={styles.formGrid}>
-              <div style={styles.field}>
-                <label style={styles.label}>{t('cash.location')}</label>
-                <select style={styles.input} value={form.locationId} onChange={(e) => setForm({ ...form, locationId: e.target.value })} required>
-                  <option value="">{t('cash.selectLocation')}</option>
-                  {locations.map((l) => <option key={l.id} value={l.id}>{l.name}</option>)}
-                </select>
-              </div>
-              <div style={styles.field}>
-                <label style={styles.label}>{t('cash.date')}</label>
-                <input type="date" style={styles.input} value={form.date} onChange={(e) => setForm({ ...form, date: e.target.value })} required />
-              </div>
-            </div>
-
-            <div style={styles.formGrid}>
-              {numField('openingAmount', t('cash.openingAmount'))}
-              {numField('closingAmount', t('cash.closingAmount'))}
-              {numField('sales', t('cash.totalSalesField'))}
-              {numField('cardSales', t('cash.cardSales'))}
-              {numField('cashSales', t('cash.cashSales'))}
-              {numField('expenses', t('cash.expenses'))}
-            </div>
-
-            <div style={styles.field}>
-              <label style={styles.label}>{t('schedules.notes')}</label>
-              <textarea
-                style={{ ...styles.input, minHeight: 72, resize: 'vertical' }}
-                value={form.notes}
-                onChange={(e) => setForm({ ...form, notes: e.target.value })}
-                placeholder={t('cash.notesPlaceholder')}
-              />
-            </div>
-
-            {submitError && <p style={styles.error}>{submitError}</p>}
-            <button type="submit" style={styles.primaryBtn}>{t('cash.saveClosing')}</button>
-          </form>
-        </div>
-      )}
-
-      {/* ── Filtres ──────────────────────────────────────────────────────── */}
-      <div style={styles.filters}>
-        <select style={styles.filterSelect} value={filterLocation} onChange={(e) => setFilterLocation(e.target.value)}>
+      <div className="toolbar">
+        <Select small value={filterLocation} onChange={(e) => setFilterLocation(e.target.value)}>
           <option value="">{t('cash.allLocations')}</option>
-          {locations.map((l) => <option key={l.id} value={l.id}>{l.name}</option>)}
-        </select>
+          {locations.data?.map((l) => <option key={l.id} value={l.id}>{l.name}</option>)}
+        </Select>
+        <div className="segmented">
+          {(['14', '30', '90', 'all'] as const).map((r) => <button key={r} aria-pressed={range === r} onClick={() => setRange(r)}>{r === 'all' ? t('cash.rangeAll') : t('cash.rangeDays', { n: r })}</button>)}
+        </div>
+        <span className="t-sm t-3">{t('cash.closingsCount', { n: rows.length })}</span>
       </div>
 
-      {/* ── Taula tancaments ─────────────────────────────────────────────── */}
-      <div style={styles.table}>
-        <div style={styles.tableHeader}>
-          <span>{t('cash.date_col')}</span>
-          <span>{t('cash.location_col')}</span>
-          <span>{t('cash.opening')}</span>
-          <span>{t('cash.closing')}</span>
-          <span>{t('cash.sales_col')}</span>
-          <span>{t('cash.expenses_col')}</span>
-          <span>{t('cash.difference')}</span>
-        </div>
-        {closings.length === 0 ? (
-          <p style={styles.empty}>{t('cash.noClosings')}</p>
-        ) : (
-          closings.map((c) => {
-            const diff = difference(c);
-            return (
-              <div key={c.id} style={styles.tableRow}>
-                <span>{format(new Date(c.date), 'd MMM yyyy')}</span>
-                <span>{c.location.name}</span>
-                <span>CHF {Number(c.openingAmount).toFixed(2)}</span>
-                <span>CHF {Number(c.closingAmount).toFixed(2)}</span>
-                <span style={{ fontWeight: 600 }}>CHF {Number(c.sales).toFixed(2)}</span>
-                <span>CHF {Number(c.expenses).toFixed(2)}</span>
-                <span style={{ fontWeight: 700, color: diff >= 0 ? '#5aab7a' : '#c0392b' }}>
-                  {diff >= 0 ? '+' : ''}CHF {diff.toFixed(2)}
-                </span>
-              </div>
-            );
-          })
-        )}
+      <div className="grid-kpi mb-5">
+        <StatCard label={t('cash.totalSales')} value={fmtCHF(totals.sales, { compact: true })} icon="wallet" sub={t('cash.daysN', { n: totals.days })} />
+        <StatCard label={t('cash.dailyAvg')} value={fmtCHF(totals.avg, { compact: true })} icon="trending" />
+        <StatCard label={t('cash.cardShare')} value={`${fmtNum(totals.cardShare)}%`} icon="receipt" sub={fmtCHF(totals.card, { compact: true })} />
+        <StatCard label={t('cash.expenses')} value={fmtCHF(totals.expenses, { compact: true })} icon="package" />
+        <StatCard label={t('cash.cashDifference')} value={<span className={Math.abs(totals.diff) < 0.01 ? '' : totals.diff > 0 ? 't-success' : 't-danger'}>{fmtCHF(totals.diff, { signed: true })}</span>} icon="alert" sub={t('cash.cashDifferenceSub')} />
       </div>
+
+      <div className="grid-main mb-5">
+        <Card>
+          <CardHead title={t('cash.dailySales')} sub={t('cash.dailySalesSub')} />
+          {daily.length < 2 ? <EmptyState icon="wallet" title={t('cash.noHistory')} /> : (
+            <>
+              <div className="legend mb-3"><span className="legend-item"><span className="legend-swatch" style={{ background: 'var(--viz-1)' }} />{t('cash.sales_col')}</span><span className="legend-item"><span className="legend-swatch" style={{ background: 'var(--viz-2)' }} />{t('cash.expenses_col')}</span></div>
+              <LineChart data={daily} xKey="date" height={200} xLabel={(d) => fmtDate(String(d.date), 'd MMM')}
+                series={[{ key: 'sales', label: t('cash.sales_col'), color: 'var(--viz-1)', area: true }, { key: 'expenses', label: t('cash.expenses_col'), color: 'var(--viz-2)' }]}
+                tooltip={(d) => <><b>{fmtDate(String(d.date), 'EEE d MMM')}</b><br />{t('cash.sales_col')}: {fmtCHF(Number(d.sales))}<br />{t('cash.expenses_col')}: {fmtCHF(Number(d.expenses))}</>} />
+            </>
+          )}
+        </Card>
+        <Card>
+          <CardHead title={t('cash.avgPerDay')} sub={sum ? t('cash.basedOn', { n: sum.totalClosings }) : undefined} />
+          {!analytics.data?.byDayOfWeek.length ? <EmptyState icon="chart" title={t('cash.noHistory')} /> : (
+            <>
+              <BarChart data={analytics.data.byDayOfWeek} xKey="label" height={180} xLabel={(d) => dayLabelFromCode(String(d.label))}
+                series={[{ key: 'avg', label: t('cash.dailyAvg'), color: 'var(--viz-1)' }]} highlightIndex={analytics.data.byDayOfWeek.findIndex((d) => d.day === sum?.bestDay.day)}
+                tooltip={(d) => <><b>{dayLabelFromCode(String(d.label), true)}</b><br />{fmtCHF(Number(d.avg))} · {t('cash.closingsCount', { n: Number(d.count) })}</>} />
+              {sum && <div className="row-wrap mt-3 t-sm"><Badge tone="success">{t('cash.bestDay')}: {dayLabelFromCode(sum.bestDay.label, true)}</Badge><Badge tone="warning">{t('cash.worstDay')}: {dayLabelFromCode(sum.worstDay.label, true)}</Badge></div>}
+            </>
+          )}
+        </Card>
+      </div>
+
+      <Card pad="none">
+        <div className="table-wrap" style={{ border: 0 }}>
+          <table className="table">
+            <thead>
+              <tr>
+                <th>{t('cash.date_col')}</th><th>{t('cash.location_col')}</th>
+                <th className="num">{t('cash.sales_col')}</th><th className="num hide-mobile">{t('cash.cardSales')}</th><th className="num hide-mobile">{t('cash.cashSales')}</th>
+                <th className="num">{t('cash.expenses_col')}</th><th className="num">{t('cash.closing')}</th><th className="num">{t('cash.difference')}</th>
+                {canManage && <th />}
+              </tr>
+            </thead>
+            <tbody>
+              {rows.length === 0 && <tr><td colSpan={9}><EmptyState icon="wallet" title={t('cash.noClosings')} action={canManage && <Button icon="plus" onClick={() => openNew()}>{t('cash.newClosing')}</Button>} /></td></tr>}
+              {rows.map((c) => {
+                const diff = cashDifference(c);
+                return (
+                  <tr key={c.id}>
+                    <td className="t-strong" style={{ whiteSpace: 'nowrap' }}>{fmtDate(c.date, 'EEE d MMM')}{c.notes && <Icon name="info" size={13} style={{ display: 'inline', marginLeft: 6, verticalAlign: '-2px', color: 'var(--ink-4)' }} />}</td>
+                    <td className="t-truncate" style={{ maxWidth: 200 }}>{c.location.name}</td>
+                    <td className="num t-strong">{fmtCHF(c.sales)}</td>
+                    <td className="num hide-mobile t-3">{fmtCHF(c.cardSales)}</td>
+                    <td className="num hide-mobile t-3">{fmtCHF(c.cashSales)}</td>
+                    <td className="num">{fmtCHF(c.expenses)}</td>
+                    <td className="num">{fmtCHF(c.closingAmount)}</td>
+                    <td className="num"><span className={`badge ${Math.abs(diff) < 0.01 ? 'badge-success' : Math.abs(diff) <= 5 ? 'badge-warning' : 'badge-danger'}`}>{fmtCHF(diff, { signed: true })}</span></td>
+                    {canManage && (
+                      <td className="num" style={{ whiteSpace: 'nowrap' }}>
+                        <Button size="sm" variant="ghost" icon="edit" onClick={() => openNew(c)} aria-label={t('common.edit')} />
+                        {isOwner && <Button size="sm" variant="ghost" icon="trash" onClick={() => del(c)} aria-label={t('common.delete')} />}
+                      </td>
+                    )}
+                  </tr>
+                );
+              })}
+            </tbody>
+          </table>
+        </div>
+      </Card>
+
+      <Modal open={modal.open} onClose={() => setModal({ open: false })} size="lg" title={t(modal.editing ? 'cash.editClosing' : 'cash.closingDay')} description={t('cash.formHint')}
+        footer={<><Button variant="ghost" onClick={() => setModal({ open: false })}>{t('common.cancel')}</Button><Button variant="primary" type="submit" form="closing-form" icon="check" loading={create.isPending || update.isPending}>{t('cash.saveClosing')}</Button></>}>
+        <form id="closing-form" onSubmit={submit} className="col gap-4">
+          <div className="form-grid">
+            <Field label={t('cash.location')} required>
+              <Select value={form.locationId} onChange={(e) => setForm({ ...form, locationId: e.target.value })} required disabled={!!modal.editing} autoFocus>
+                <option value="">{t('cash.selectLocation')}</option>
+                {locations.data?.map((l) => <option key={l.id} value={l.id}>{l.name}</option>)}
+              </Select>
+            </Field>
+            <Field label={t('cash.date')} required><Input type="date" value={form.date} max={todayISO()} onChange={(e) => setForm({ ...form, date: e.target.value })} required disabled={!!modal.editing} /></Field>
+          </div>
+          <div className="form-grid">
+            {num('cardSales', t('cash.cardSales'))}
+            {num('cashSales', t('cash.cashSales'))}
+            {num('expenses', t('cash.expenses'), t('cash.expensesHint'))}
+            {num('openingAmount', t('cash.openingAmount'))}
+            {num('closingAmount', t('cash.closingAmount'), t('cash.closingHint'))}
+          </div>
+          <div className="row-wrap" style={{ gap: 14, padding: '12px 14px', borderRadius: 10, background: 'var(--surface-2)' }}>
+            <span className="t-sm">{t('cash.totalSalesField')}: <b>{fmtCHF(sales)}</b></span>
+            <span className="t-sm">{t('cash.expectedDrawer')}: <b>{fmtCHF(expected)}</b></span>
+            <span className={`t-sm ${Math.abs(liveDiff) < 0.01 ? 't-success' : Math.abs(liveDiff) <= 5 ? 't-warning' : 't-danger'}`}>{t('cash.difference')}: <b>{fmtCHF(liveDiff, { signed: true })}</b></span>
+          </div>
+          <Field label={t('schedules.notes')}><Textarea value={form.notes} onChange={(e) => setForm({ ...form, notes: e.target.value })} placeholder={t('cash.notesPlaceholder')} style={{ minHeight: 60 }} /></Field>
+          {formError && <div className="error-box">{formError}</div>}
+        </form>
+      </Modal>
     </div>
   );
 }
-
-const styles: Record<string, React.CSSProperties> = {
-  primaryBtn: { padding: '9px 18px', backgroundColor: '#2D3250', color: '#F4E285', border: 'none', borderRadius: 8, fontSize: 13, fontWeight: 700, cursor: 'pointer' },
-  analyticsBtn: { padding: '8px 14px', backgroundColor: '#fff', color: '#2D3250', border: '1.5px solid #e2ddd5', borderRadius: 8, fontSize: 13, fontWeight: 600, cursor: 'pointer' },
-  analyticsBtnActive: { backgroundColor: '#F4E285', borderColor: '#F4E285' },
-  formCard: { backgroundColor: '#fff', borderRadius: 12, padding: '20px 24px', marginBottom: 20, boxShadow: '0 1px 6px rgba(45,50,80,0.07)' },
-  formTitle: { fontSize: 14, fontWeight: 700, margin: '0 0 16px', color: '#2D3250' },
-  formGrid: { display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(180px, 1fr))', gap: 14, marginBottom: 16 },
-  field: { display: 'flex', flexDirection: 'column', gap: 4, marginBottom: 12 },
-  label: { fontSize: 12, fontWeight: 600, color: '#666' },
-  input: { padding: '8px 10px', border: '1.5px solid #e2ddd5', borderRadius: 6, fontSize: 13, outline: 'none', backgroundColor: '#faf9f7' },
-  inputWrapper: { display: 'flex', alignItems: 'center', border: '1.5px solid #e2ddd5', borderRadius: 6, overflow: 'hidden' },
-  currency: { padding: '8px 8px', backgroundColor: '#F5F3EC', fontSize: 12, color: '#888', borderRight: '1px solid #e2ddd5' },
-  inputCurrency: { padding: '8px 10px', border: 'none', fontSize: 13, outline: 'none', flex: 1, width: 0, backgroundColor: '#faf9f7' },
-  error: { fontSize: 13, color: '#c0392b', margin: '0 0 12px', padding: '8px 12px', backgroundColor: '#fef2f2', borderRadius: 6, border: '1px solid #fecaca' },
-  filters: { display: 'flex', gap: 12, marginBottom: 20 },
-  filterSelect: { padding: '7px 10px', border: '1.5px solid #e2ddd5', borderRadius: 6, fontSize: 13, outline: 'none', backgroundColor: '#fff' },
-  table: { backgroundColor: '#fff', borderRadius: 12, overflow: 'hidden', boxShadow: '0 1px 4px rgba(45,50,80,0.06)' },
-  tableHeader: {
-    display: 'grid',
-    gridTemplateColumns: '120px 1fr repeat(5, 110px)',
-    padding: '12px 20px',
-    backgroundColor: '#F5F3EC',
-    fontSize: 11,
-    fontWeight: 700,
-    color: '#999',
-    textTransform: 'uppercase',
-    letterSpacing: '0.5px',
-    borderBottom: '1px solid #eee',
-  },
-  tableRow: {
-    display: 'grid',
-    gridTemplateColumns: '120px 1fr repeat(5, 110px)',
-    padding: '14px 20px',
-    fontSize: 13,
-    color: '#333',
-    borderBottom: '1px solid #f5f2ec',
-    alignItems: 'center',
-  },
-  empty: { padding: '24px 20px', color: '#bbb', fontSize: 13, margin: 0 },
-  // Analytics panel
-  analyticsPanel: { backgroundColor: '#fffbea', border: '1.5px solid #F4E285', borderRadius: 12, padding: '16px 20px', marginBottom: 20 },
-  analyticsPanelHead: { marginBottom: 14 },
-  analyticsPanelTitle: { fontSize: 14, fontWeight: 700, color: '#2D3250', display: 'block' },
-  analyticsPanelSub: { fontSize: 11, color: '#a08a00', display: 'block', marginTop: 2 },
-  kpiRow: { display: 'flex', gap: 12, flexWrap: 'wrap', marginBottom: 16 },
-  kpi: { backgroundColor: '#fff', borderRadius: 8, padding: '10px 14px', flex: 1, minWidth: 120, display: 'flex', flexDirection: 'column', gap: 2 },
-  kpiLabel: { fontSize: 10, fontWeight: 600, color: '#aaa', textTransform: 'uppercase', letterSpacing: '0.4px' },
-  kpiVal: { fontSize: 18, fontWeight: 700, color: '#2D3250' },
-  kpiSub: { fontSize: 10, color: '#bbb' },
-  chartsRow: { display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(240px, 1fr))', gap: 14 },
-  chartCard: { backgroundColor: '#fff', borderRadius: 8, padding: '12px 14px' },
-  chartTitle: { fontSize: 11, fontWeight: 700, color: '#666', textTransform: 'uppercase', letterSpacing: '0.4px' },
-  forecastRow: { display: 'flex', justifyContent: 'space-between', fontSize: 11, padding: '4px 0', borderBottom: '1px solid #f5f2ec' },
-  forecastDate: { color: '#555', fontWeight: 600 },
-  forecastVal: { fontWeight: 700, color: '#4f7bdb' },
-};

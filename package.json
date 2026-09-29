@@ -2,7 +2,7 @@
   "name": "coffe_logic",
   "version": "1.0.0",
   "private": true,
-  "description": "Massiu Soft – multi-local café management platform for the Swiss market",
+  "description": "Massiu Soft \u2013 multi-local caf\u00e9 management platform for the Swiss market",
   "workspaces": [
     "backend",
     "frontend"
@@ -10,11 +10,15 @@
   "scripts": {
     "dev": "concurrently \"npm run dev --workspace=backend\" \"npm run dev --workspace=frontend\"",
     "build": "npm run build --workspace=backend && npm run build --workspace=frontend",
-    "lint": "npm run lint --workspace=backend && npm run lint --workspace=frontend",
+    "lint": "npm run lint --workspace=backend && npm run lint --workspace=frontend && node scripts/check-locales.mjs",
     "db:migrate": "npm run prisma:migrate --workspace=backend",
     "db:generate": "npm run prisma:generate --workspace=backend",
     "db:seed": "npm run prisma:seed --workspace=backend",
-    "db:studio": "npm run prisma:studio --workspace=backend"
+    "db:studio": "npm run prisma:studio --workspace=backend",
+    "typecheck": "npm run lint --workspace=backend && npm run lint --workspace=frontend && node scripts/check-locales.mjs",
+    "check:locales": "node scripts/check-locales.mjs",
+    "build:demo": "cd frontend && VITE_DEMO_MODE=true npm run build",
+    "db:push": "npm run prisma:push --workspace=backend"
   },
   "devDependencies": {
     "concurrently": "^8.2.2"

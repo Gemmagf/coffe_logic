@@ -1,8 +1,6 @@
-import client from './client';
+import client, { DEMO } from './client';
 import type { LoginResponse } from '../types';
 import { mockLogin } from './mock/handlers';
-
-const DEMO = import.meta.env.VITE_DEMO_MODE === 'true';
 
 export const login = async (email: string, password: string): Promise<LoginResponse['data']> => {
   if (DEMO) return mockLogin(email, password);

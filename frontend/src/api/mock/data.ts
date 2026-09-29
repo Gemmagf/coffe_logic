@@ -129,7 +129,7 @@ export let SCHEDULES: Schedule[] = buildSchedules();
 export let ORDERS: Order[] = [
   { id: 'ord-01', supplierId: 'sup-01', locationId: 'demo-loc-001', status: 'RECEIVED', deliveryAt: fmt(addDays(now, -10)), notes: 'Entregat sense incidències.',
     items: [{ productName: 'Espresso blend premium', quantity: 8, unit: 'kg', unitPrice: 32.50 }, { productName: 'Descafeinat', quantity: 2, unit: 'kg', unitPrice: 34.00 }],
-    supplier: { id: 'sup-01', name: 'Kaffee Zürich AG' }, location: { id: 'demo-loc-001', name: 'The Commercial – Zürich HB' }, createdAt: fmt(addDays(now, -12)) },
+    supplier: { id: 'sup-01', name: 'Kaffee Zürich AG' }, location: { id: 'demo-loc-001', name: 'The Commercial – Zürich HB' }, createdAt: fmt(addDays(now, -12)) + 'T09:00:00Z' },
   { id: 'ord-02', supplierId: 'sup-02', locationId: 'demo-loc-002', status: 'RECEIVED', deliveryAt: fmt(addDays(now, -8)), notes: 'Croissants molt frescos.',
     items: [{ productName: 'Croissants mantequilla', quantity: 100, unit: 'u', unitPrice: 0.85 }, { productName: 'Pain au chocolat', quantity: 60, unit: 'u', unitPrice: 0.95 }, { productName: 'Baguette', quantity: 30, unit: 'u', unitPrice: 1.20 }],
     supplier: { id: 'sup-02', name: 'Bäckerei Hug AG' }, location: { id: 'demo-loc-002', name: 'The Commercial – Oerlikon' }, createdAt: fmt(addDays(now, -10)) },
@@ -187,7 +187,7 @@ function buildClosings(): CashClosing[] {
       const cashSales = Math.round((sales - cardSales) * 100) / 100;
       const expenses = isWeekend ? 25 : 15 + (Math.abs(dOff) % 3) * 8;
       const disc = seed % 9 === 0 ? -4.5 : seed % 7 === 0 ? 2.0 : 0;
-      const closing = Math.round((200 + sales - expenses + disc) * 100) / 100;
+      const closing = Math.round((200 + cashSales - expenses + disc) * 100) / 100; // drawer holds cash only
       const notes = dOff === -7 && loc.id === 'demo-loc-001' ? 'TPV avariat a la tarda, algunes vendes en efectiu.'
         : dOff === -3 && loc.id === 'demo-loc-002' ? 'Mercat proper, +20% clients.' : null;
       counter++;
