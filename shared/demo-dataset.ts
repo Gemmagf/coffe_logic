@@ -189,14 +189,14 @@ export const COMMERCIAL: DatasetDef = {
   profile: 'commercial',
   group: { id: 'ctp-group-001', name: 'Commercial – The Project', plan: 'MULTI' },
   users: [
-    { id: 'ctp-user-001', username: 'thecommercialproject', email: 'nick@commercial-theproject.ch', password: 'Nikos', role: 'MANAGER' },
+    { id: 'ctp-user-001', username: 'thecommercialproject', email: 'nick@commercial-theproject.ch', password: 'Nikos', role: 'OWNER' },
   ],
   locations: [
     { id: C.feld, name: 'Commercial – Feldstrasse', address: 'Feldstrasse 61, 8004 Zürich (Kreis 4)' },
     { id: C.bahn, name: 'Commercial – Bahnhofstrasse', address: 'Bahnhofstrasse 75/79, 8001 Zürich' },
   ],
   employees: [
-    { id: 'ctp-emp-001', name: 'Nick',             email: 'nick@commercial-theproject.ch',   phone: '',                  position: 'Manager & barista', weeklyHours: null, locations: [C.feld, C.bahn] },
+    { id: 'ctp-emp-001', name: 'Nick',             email: 'nick@commercial-theproject.ch',   phone: '',                  position: 'Owner & barista',   weeklyHours: null, locations: [C.feld, C.bahn] },
     { id: 'ctp-emp-002', name: 'Elena Papadaki',   email: 'elena@commercial-theproject.ch',  phone: '+41 79 201 11 21', position: 'Head barista',      weeklyHours: 42, locations: [C.feld, C.bahn] },
     { id: 'ctp-emp-003', name: 'Luca Brunner',     email: 'luca@commercial-theproject.ch',   phone: '+41 79 202 22 32', position: 'Barista',           weeklyHours: 40, locations: [C.bahn] },
     { id: 'ctp-emp-004', name: 'Mira Keller',      email: 'mira@commercial-theproject.ch',   phone: '+41 79 204 44 54', position: 'Barista',           weeklyHours: 32, locations: [C.feld] },
