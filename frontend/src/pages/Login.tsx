@@ -89,13 +89,13 @@ export default function Login() {
           {expired && !error && <div className="notice notice-warning mb-4"><Icon name="clock" /><span>{t('auth.expired')}</span></div>}
 
           <button
-            type="button" className="btn btn-accent btn-lg btn-block" style={{ height: 52, flexDirection: 'column', gap: 2 }}
+            type="button" className="btn btn-accent btn-lg btn-block" style={{ height: 54, flexDirection: 'column', gap: 2 }}
             onClick={() => doLogin(DEMO_USER, DEMO_PASS, 'demo')} disabled={busy !== null}
           >
             {busy === 'demo' ? <span className="spinner" /> : (
               <>
                 <span className="row gap-2"><Icon name="sparkles" />{t('auth.tryDemo')}</span>
-                <span style={{ fontSize: 10.5, fontWeight: 600, opacity: 0.7, letterSpacing: '0.04em', textTransform: 'uppercase' }}>Commercial – The Project · Zürich</span>
+                <span style={{ fontSize: 10.5, fontWeight: 600, opacity: 0.7, letterSpacing: '0.04em', textTransform: 'uppercase' }}>{t('auth.tryDemoSub')}</span>
               </>
             )}
           </button>
@@ -126,9 +126,7 @@ export default function Login() {
             </Button>
           </form>
 
-          <p className="t-xs t-4 mt-6" style={{ textAlign: 'center' }}>
-            {t('auth.demoCredentials', { email: DEMO_USER, password: DEMO_PASS })}{DEMO ? ` · ${t('auth.demoModeHint')}` : ''}
-          </p>
+          {DEMO && <p className="t-xs t-4 mt-6" style={{ textAlign: 'center' }}>{t('auth.demoModeHint')}</p>}
         </div>
       </section>
     </div>

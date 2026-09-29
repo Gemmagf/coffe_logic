@@ -16,7 +16,7 @@ const LoginSchema = z.object({
   password: z.string().min(1),
 });
 
-/** Usernames are compared case-insensitively and ignoring whitespace ("The Commercial Project" == "thecommercialproject"). */
+/** Usernames are compared case-insensitively and ignoring whitespace ("My Café" == "mycafé"). */
 const normalizeUsername = (v: string) => v.toLowerCase().replace(/\s+/g, '');
 
 const RegisterSchema = z.object({

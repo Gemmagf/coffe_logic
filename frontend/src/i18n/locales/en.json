@@ -65,10 +65,10 @@
     "hidePassword": "Hide password",
     "expired": "Your session has expired. Please sign in again.",
     "error": "Could not sign in",
-    "demoModeHint": "serverless build",
-    "demoCredentials": "Demo access: user “{{email}}” · password “{{password}}”",
+    "demoModeHint": "Serverless demo build: all data is fictional.",
     "identifier": "Username or email",
-    "identifierPlaceholder": "the commercial project"
+    "identifierPlaceholder": "Username or email",
+    "tryDemoSub": "Sample data for a café with three locations"
   },
   "dashboard": {
     "goodMorning": "Good morning",

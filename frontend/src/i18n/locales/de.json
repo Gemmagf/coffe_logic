@@ -65,10 +65,10 @@
     "hidePassword": "Passwort ausblenden",
     "expired": "Ihre Sitzung ist abgelaufen. Bitte melden Sie sich erneut an.",
     "error": "Anmeldung fehlgeschlagen",
-    "demoModeHint": "Version ohne Server",
-    "demoCredentials": "Demo-Zugang: Benutzer «{{email}}» · Passwort «{{password}}»",
+    "demoModeHint": "Demo-Version ohne Server: alle Daten sind fiktiv.",
     "identifier": "Benutzername oder E-Mail",
-    "identifierPlaceholder": "the commercial project"
+    "identifierPlaceholder": "Benutzername oder E-Mail",
+    "tryDemoSub": "Beispieldaten eines Cafés mit drei Standorten"
   },
   "dashboard": {
     "goodMorning": "Guten Morgen",

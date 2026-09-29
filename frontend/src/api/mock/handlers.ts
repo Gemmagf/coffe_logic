@@ -49,10 +49,10 @@ function between(date: string, from?: string, to?: string) {
 
 /** Demo accounts. Usernames are compared ignoring case and spaces, like the real backend. */
 const DEMO_ACCOUNTS: { username: string; email: string; password: string; role: User['role']; id: string }[] = [
-  { id: 'demo-user-001', username: 'thecommercialproject', email: 'nick@commercial-theproject.ch',  password: 'Nikos',    role: 'OWNER' },
-  { id: 'demo-user-002', username: 'elena',                email: 'elena@commercial-theproject.ch', password: 'demo1234', role: 'MANAGER' },
+  { id: 'demo-user-001', username: 'thecommercialproject', email: 'owner@mosaik-kaffee.ch',  password: 'Nikos',    role: 'OWNER' },
+  { id: 'demo-user-002', username: 'elena',                email: 'elena@mosaik-kaffee.ch', password: 'demo1234', role: 'MANAGER' },
 ];
-const GROUP = { id: 'demo-group-001', name: 'Commercial – The Project', plan: 'MULTI' as const, createdAt: '2024-01-15T08:00:00Z' };
+const GROUP = { id: 'demo-group-001', name: 'Mosaik Kaffee', plan: 'MULTI' as const, createdAt: '2024-01-15T08:00:00Z' };
 
 export const mockLogin = async (identifier: string, password: string) => {
   await delay(null);

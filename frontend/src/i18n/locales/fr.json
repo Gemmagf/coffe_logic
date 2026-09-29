@@ -65,10 +65,10 @@
     "hidePassword": "Masquer le mot de passe",
     "expired": "Votre session a expiré. Veuillez vous reconnecter.",
     "error": "Connexion impossible",
-    "demoModeHint": "version sans serveur",
-    "demoCredentials": "Accès démo : utilisateur « {{email}} » · mot de passe « {{password}} »",
+    "demoModeHint": "Version démo sans serveur : toutes les données sont fictives.",
     "identifier": "Nom d’utilisateur ou e-mail",
-    "identifierPlaceholder": "the commercial project"
+    "identifierPlaceholder": "Nom d’utilisateur ou e-mail",
+    "tryDemoSub": "Données d’exemple d’un café à trois adresses"
   },
   "dashboard": {
     "goodMorning": "Bonjour",
