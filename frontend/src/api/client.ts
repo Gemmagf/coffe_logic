@@ -1,26 +1,28 @@
 import axios from 'axios';
 
+export const DEMO = import.meta.env.VITE_DEMO_MODE === 'true';
+
 const apiClient = axios.create({
   baseURL: import.meta.env.VITE_API_URL ?? '/api',
   headers: { 'Content-Type': 'application/json' },
+  timeout: 20_000,
 });
 
 // Attach JWT token to every request
 apiClient.interceptors.request.use((config) => {
   const token = localStorage.getItem('token');
-  if (token) {
-    config.headers.Authorization = `Bearer ${token}`;
-  }
+  if (token) config.headers.Authorization = `Bearer ${token}`;
   return config;
 });
 
-// Redirect to login on 401
+// On 401, clear the session and send the user to the login route (hash router aware).
 apiClient.interceptors.response.use(
   (response) => response,
   (error) => {
-    if (error.response?.status === 401) {
+    if (error.response?.status === 401 && !String(error.config?.url ?? '').includes('/auth/login')) {
       localStorage.removeItem('token');
-      window.location.href = '/login';
+      localStorage.removeItem('coffe-logic-auth');
+      if (!window.location.hash.startsWith('#/login')) window.location.hash = '#/login?expired=1';
     }
     return Promise.reject(error);
   }

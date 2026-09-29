@@ -2,7 +2,9 @@ import { Router, Request, Response, NextFunction } from 'express';
 import bcrypt from 'bcryptjs';
 import { z } from 'zod';
 import prisma from '../config/database';
-import { generateToken } from '../middleware/auth';
+import { authenticate, generateToken } from '../middleware/auth';
+import { rateLimit } from '../middleware/rateLimit';
+import { AuthRequest, Role } from '../types';
 import { createError } from '../middleware/errorHandler';
 
 const router = Router();
@@ -23,7 +25,9 @@ const RegisterSchema = z.object({
 
 // ─── POST /api/auth/login ─────────────────────────────────────────────────────
 
-router.post('/login', async (req: Request, res: Response, next: NextFunction) => {
+const loginLimiter = rateLimit({ windowMs: 15 * 60 * 1000, max: 20 });
+
+router.post('/login', loginLimiter, async (req: Request, res: Response, next: NextFunction) => {
   try {
     const { email, password } = LoginSchema.parse(req.body);
 
@@ -44,7 +48,7 @@ router.post('/login', async (req: Request, res: Response, next: NextFunction) =>
     const token = generateToken({
       userId: user.id,
       groupId: user.groupId,
-      role: user.role as import("../types").Role,
+      role: user.role as Role,
       email: user.email,
     });
 
@@ -55,7 +59,8 @@ router.post('/login', async (req: Request, res: Response, next: NextFunction) =>
         user: {
           id: user.id,
           email: user.email,
-          role: user.role as import("../types").Role,
+          role: user.role as Role,
+          groupId: user.groupId,
           group: { id: user.group.id, name: user.group.name, plan: user.group.plan },
         },
       },
@@ -89,7 +94,7 @@ router.post('/register', async (req: Request, res: Response, next: NextFunction)
     const token = generateToken({
       userId: user.id,
       groupId: user.groupId,
-      role: user.role as import("../types").Role,
+      role: user.role as Role,
       email: user.email,
     });
 
@@ -100,7 +105,8 @@ router.post('/register', async (req: Request, res: Response, next: NextFunction)
         user: {
           id: user.id,
           email: user.email,
-          role: user.role as import("../types").Role,
+          role: user.role as Role,
+          groupId: user.groupId,
           group: { id: group.id, name: group.name, plan: group.plan },
         },
       },
@@ -112,20 +118,10 @@ router.post('/register', async (req: Request, res: Response, next: NextFunction)
 
 // ─── GET /api/auth/me ─────────────────────────────────────────────────────────
 
-router.get('/me', async (req: Request, res: Response, next: NextFunction) => {
+router.get('/me', authenticate, async (req: AuthRequest, res: Response, next: NextFunction) => {
   try {
-    const authHeader = req.headers.authorization;
-    if (!authHeader?.startsWith('Bearer ')) {
-      throw createError('No autenticat', 401);
-    }
-
-    // The authenticate middleware sets req.user; re-import here to avoid circular deps
-    const jwt = await import('jsonwebtoken');
-    const secret = process.env.JWT_SECRET ?? 'fallback-secret-change-in-production';
-    const payload = jwt.default.verify(authHeader.split(' ')[1], secret) as { userId: string };
-
     const user = await prisma.user.findUnique({
-      where: { id: payload.userId },
+      where: { id: req.user!.userId },
       include: { group: true },
     });
 
@@ -136,7 +132,8 @@ router.get('/me', async (req: Request, res: Response, next: NextFunction) => {
       data: {
         id: user.id,
         email: user.email,
-        role: user.role as import("../types").Role,
+        role: user.role as Role,
+        groupId: user.groupId,
         group: { id: user.group.id, name: user.group.name, plan: user.group.plan },
       },
     });

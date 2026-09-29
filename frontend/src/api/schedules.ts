@@ -1,8 +1,6 @@
-import client from './client';
+import client, { DEMO } from './client';
 import type { ApiResponse, Schedule } from '../types';
 import { mockGetSchedules, mockCreateSchedule, mockUpdateSchedule, mockDeleteSchedule } from './mock/handlers';
-
-const DEMO = import.meta.env.VITE_DEMO_MODE === 'true';
 
 export interface ScheduleFilters {
   locationId?: string;

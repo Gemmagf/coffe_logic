@@ -1,7 +1,5 @@
-import client from './client';
+import client, { DEMO } from './client';
 import { mockGetCashAnalytics, mockGetOrdersAnalytics, mockGetStaffingAnalytics } from './mock/handlers';
-
-const DEMO = import.meta.env.VITE_DEMO_MODE === 'true';
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 

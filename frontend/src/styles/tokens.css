@@ -1,0 +1,190 @@
+/* ─── Cafgic design tokens ────────────────────────────────────────────────
+   Light is the default. Dark redefines the same names under both the OS
+   preference (guarded so an explicit light choice wins) and the explicit
+   data-theme="dark" stamp set by the theme toggle. */
+
+:root {
+  color-scheme: light;
+
+  /* Brand */
+  --brand-900: #1F2340;
+  --brand-800: #262B4A;
+  --brand-700: #2D3250;
+  --brand-600: #3B4168;
+  --brand-500: #4A5284;
+  --brand-100: #E4E6F1;
+  --accent:      #F4E285;
+  --accent-600:  #E3CC4E;
+  --accent-ink:  #2D3250;
+  --brand-ink:   #2D3250;   /* brand-coloured text/icons on surfaces; accent in dark */
+  --amber:       #E8A838;
+
+  /* Surfaces */
+  --bg:          #F5F3EC;
+  --bg-sunken:   #EDEAE0;
+  --surface:     #FFFFFF;
+  --surface-2:   #FAF9F5;
+  --surface-3:   #F3F1EA;
+  --border:      #E6E2D8;
+  --border-strong:#D3CEC2;
+  --overlay:     rgba(31, 35, 64, 0.55);
+
+  /* Ink */
+  --ink:         #1F2340;
+  --ink-2:       #4B5068;
+  --ink-3:       #7B8099;
+  --ink-4:       #A8ACBE;
+  --ink-inverse: #FFFFFF;
+
+  /* Sidebar (always dark) */
+  --side-bg:      #2D3250;
+  --side-bg-2:    #262B4A;
+  --side-ink:     #B7BDD6;
+  --side-ink-muted:#6E7594;
+  --side-active:  rgba(255,255,255,0.08);
+  --side-border:  rgba(255,255,255,0.07);
+
+  /* Status */
+  --success:     #2E8B57;
+  --success-bg:  #E5F3EA;
+  --warning:     #B7791F;
+  --warning-bg:  #FBF1DC;
+  --danger:      #C0392B;
+  --danger-bg:   #FBE9E7;
+  --info:        #2A6FBE;
+  --info-bg:     #E4EEFA;
+
+  /* Data viz (validated palette, adjacent pairs pass CVD checks) */
+  --viz-1: #2a78d6;
+  --viz-2: #eb6834;
+  --viz-3: #1baf7a;
+  --viz-4: #eda100;
+  --viz-muted: #B9BDCB;
+  --viz-grid: #ECEAE3;
+
+  /* Shape */
+  --r-xs: 6px;
+  --r-sm: 8px;
+  --r-md: 12px;
+  --r-lg: 16px;
+  --r-xl: 22px;
+  --r-full: 999px;
+
+  /* Elevation */
+  --shadow-xs: 0 1px 2px rgba(31,35,64,0.05);
+  --shadow-sm: 0 1px 3px rgba(31,35,64,0.06), 0 1px 2px rgba(31,35,64,0.04);
+  --shadow-md: 0 6px 20px rgba(31,35,64,0.08), 0 2px 6px rgba(31,35,64,0.05);
+  --shadow-lg: 0 18px 48px rgba(31,35,64,0.16), 0 4px 12px rgba(31,35,64,0.08);
+  --ring:      0 0 0 3px rgba(244,226,133,0.55);
+
+  /* Type */
+  --font: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif;
+  --font-mono: 'JetBrains Mono', ui-monospace, SFMono-Regular, Menlo, monospace;
+  --fs-xs: 11px;
+  --fs-sm: 12.5px;
+  --fs-md: 14px;
+  --fs-lg: 16px;
+  --fs-xl: 20px;
+  --fs-2xl: 26px;
+  --fs-3xl: 34px;
+
+  /* Motion */
+  --ease: cubic-bezier(0.2, 0.7, 0.2, 1);
+  --t-fast: 120ms var(--ease);
+  --t-med: 220ms var(--ease);
+
+  /* Layout */
+  --sidebar-w: 236px;
+  --sidebar-w-collapsed: 72px;
+  --content-max: 1240px;
+  --gutter: 32px;
+}
+
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme="light"]) { --is-dark: 1; }
+}
+:root[data-theme="dark"] { --is-dark: 1; }
+
+/* Dark palette. Declared twice so the explicit stamp always wins. */
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme="light"]) {
+    color-scheme: dark;
+    --bg:          #14161F;
+    --bg-sunken:   #0F1118;
+    --surface:     #1B1D2B;
+    --surface-2:   #202333;
+    --surface-3:   #262A3C;
+    --border:      #2C3043;
+    --border-strong:#3B4058;
+    --overlay:     rgba(0,0,0,0.6);
+    --ink:         #F1F2F8;
+    --ink-2:       #C3C6D8;
+    --ink-3:       #8B90A8;
+    --ink-4:       #5D6279;
+    --ink-inverse: #1F2340;
+    --brand-100:   #2A2F4B;
+    --brand-ink:   #F4E285;
+    --side-bg:     #12141D;
+    --side-bg-2:   #0F1118;
+    --side-border: rgba(255,255,255,0.06);
+    --success:     #5BC58A;
+    --success-bg:  #17301F;
+    --warning:     #E2B15A;
+    --warning-bg:  #352A12;
+    --danger:      #F0716A;
+    --danger-bg:   #3A1B19;
+    --info:        #6BA3F0;
+    --info-bg:     #1A2A45;
+    --viz-1: #3987e5;
+    --viz-2: #d95926;
+    --viz-3: #199e70;
+    --viz-4: #c98500;
+    --viz-muted: #4D5268;
+    --viz-grid: #262A3C;
+    --shadow-xs: 0 1px 2px rgba(0,0,0,0.4);
+    --shadow-sm: 0 1px 3px rgba(0,0,0,0.5);
+    --shadow-md: 0 6px 20px rgba(0,0,0,0.45);
+    --shadow-lg: 0 18px 48px rgba(0,0,0,0.6);
+    --ring:      0 0 0 3px rgba(244,226,133,0.35);
+  }
+}
+:root[data-theme="dark"] {
+  color-scheme: dark;
+  --bg:          #14161F;
+  --bg-sunken:   #0F1118;
+  --surface:     #1B1D2B;
+  --surface-2:   #202333;
+  --surface-3:   #262A3C;
+  --border:      #2C3043;
+  --border-strong:#3B4058;
+  --overlay:     rgba(0,0,0,0.6);
+  --ink:         #F1F2F8;
+  --ink-2:       #C3C6D8;
+  --ink-3:       #8B90A8;
+  --ink-4:       #5D6279;
+  --ink-inverse: #1F2340;
+  --brand-100:   #2A2F4B;
+  --brand-ink:   #F4E285;
+  --side-bg:     #12141D;
+  --side-bg-2:   #0F1118;
+  --side-border: rgba(255,255,255,0.06);
+  --success:     #5BC58A;
+  --success-bg:  #17301F;
+  --warning:     #E2B15A;
+  --warning-bg:  #352A12;
+  --danger:      #F0716A;
+  --danger-bg:   #3A1B19;
+  --info:        #6BA3F0;
+  --info-bg:     #1A2A45;
+  --viz-1: #3987e5;
+  --viz-2: #d95926;
+  --viz-3: #199e70;
+  --viz-4: #c98500;
+  --viz-muted: #4D5268;
+  --viz-grid: #262A3C;
+  --shadow-xs: 0 1px 2px rgba(0,0,0,0.4);
+  --shadow-sm: 0 1px 3px rgba(0,0,0,0.5);
+  --shadow-md: 0 6px 20px rgba(0,0,0,0.45);
+  --shadow-lg: 0 18px 48px rgba(0,0,0,0.6);
+  --ring:      0 0 0 3px rgba(244,226,133,0.35);
+}

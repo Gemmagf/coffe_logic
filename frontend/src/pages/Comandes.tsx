@@ -1,379 +1,273 @@
-import { useEffect, useState } from 'react';
-import { format } from 'date-fns';
+import { useEffect, useMemo, useState } from 'react';
+import { useSearchParams } from 'react-router-dom';
 import { useTranslation } from 'react-i18next';
-import Header from '../components/layout/Header';
-import { getOrders, createOrder, updateOrderStatus, deleteOrder } from '../api/orders';
-import { getOrdersAnalytics, type OrdersAnalytics } from '../api/analytics';
-import { getLocations } from '../api/locations';
-import type { Order, OrderStatus, Location, OrderItem } from '../types';
-import client from '../api/client';
+import PageHeader from '../components/ui/PageHeader';
+import Button from '../components/ui/Button';
+import Card, { CardHead } from '../components/ui/Card';
+import Badge from '../components/ui/Badge';
+import Icon from '../components/ui/Icon';
+import Modal from '../components/ui/Modal';
+import EmptyState from '../components/ui/EmptyState';
+import { Field, Input, Select, Textarea } from '../components/ui/Field';
+import { PageSkeleton } from '../components/ui/Skeleton';
+import { useToast } from '../components/ui/Toast';
+import { useConfirm } from '../components/ui/Confirm';
+import { useLocations, useSuppliers, useOrders, useOrdersAnalytics, useOrderMutations } from '../hooks/queries';
+import { useCanManage } from '../store/authStore';
+import { getErrorMessage } from '../lib/errors';
+import { fmtCHF, fmtNum } from '../lib/format';
+import { fmtDate, relativeDays } from '../lib/dates';
+import { STATUS_COLOR } from '../lib/colors';
+import type { Order, OrderItem, OrderStatus } from '../types';
 
-const STATUS_COLORS: Record<OrderStatus, string> = {
-  DRAFT: '#E8A838',
-  SENT: '#4f7bdb',
-  RECEIVED: '#5aab7a',
-};
+const STATUSES: OrderStatus[] = ['DRAFT', 'SENT', 'RECEIVED'];
+const UNITS = ['kg', 'g', 'L', 'u', 'pack', 'box'];
+const emptyItem = (): OrderItem => ({ productName: '', quantity: 1, unit: 'kg', unitPrice: 0 });
+const orderTotal = (items: OrderItem[]) => items.reduce((s, i) => s + (Number(i.quantity) || 0) * (Number(i.unitPrice) || 0), 0);
 
 export default function Comandes() {
   const { t } = useTranslation();
-
-  const STATUS_LABELS: Record<OrderStatus, string> = {
-    DRAFT: t('orders.status.DRAFT'),
-    SENT: t('orders.status.SENT'),
-    RECEIVED: t('orders.status.RECEIVED'),
-  };
-  const [orders, setOrders] = useState<Order[]>([]);
-  const [locations, setLocations] = useState<Location[]>([]);
-  const [suppliers, setSuppliers] = useState<{ id: string; name: string }[]>([]);
+  const toast = useToast();
+  const confirm = useConfirm();
+  const canManage = useCanManage();
+  const [params, setParams] = useSearchParams();
   const [filterStatus, setFilterStatus] = useState<OrderStatus | ''>('');
   const [filterLocation, setFilterLocation] = useState('');
-  const [showForm, setShowForm] = useState(false);
-  const [loading, setLoading] = useState(true);
-  const [analytics, setAnalytics] = useState<OrdersAnalytics | null>(null);
-  const [showAnalytics, setShowAnalytics] = useState(false);
-  const [orderingFor, setOrderingFor] = useState<string | null>(null);
-  const [selectedLocation, setSelectedLocation] = useState('');
-  const [orderSuccess, setOrderSuccess] = useState('');
+  const [search, setSearch] = useState('');
+  const [showRecs, setShowRecs] = useState(true);
+  const [modal, setModal] = useState(false);
+  const [detail, setDetail] = useState<Order | null>(null);
+  const [form, setForm] = useState({ supplierId: '', locationId: '', notes: '', deliveryAt: '', items: [emptyItem()] });
+  const [quick, setQuick] = useState<{ supplierId: string; locationId: string } | null>(null);
+  const [formError, setFormError] = useState('');
 
-  const emptyItem = (): OrderItem => ({ productName: '', quantity: 1, unit: 'kg', unitPrice: 0 });
-
-  const [form, setForm] = useState({
-    supplierId: '',
-    locationId: '',
-    notes: '',
-    deliveryAt: '',
-    items: [emptyItem()],
-  });
-
-  const fetchOrders = () => {
-    getOrders({
-      ...(filterStatus ? { status: filterStatus } : {}),
-      ...(filterLocation ? { locationId: filterLocation } : {}),
-    }).then(setOrders).catch(console.error);
-  };
+  const locations = useLocations();
+  const suppliers = useSuppliers();
+  const orders = useOrders({ ...(filterLocation ? { locationId: filterLocation } : {}) });
+  const analytics = useOrdersAnalytics();
+  const { create, setStatus, remove } = useOrderMutations();
 
   useEffect(() => {
-    Promise.all([
-      getLocations(),
-      client.get('/suppliers').then((r) => r.data.data),
-      getOrdersAnalytics(),
-    ])
-      .then(([locs, sups, anal]) => {
-        setLocations(locs);
-        setSuppliers(sups);
-        setAnalytics(anal);
-        if (anal.suggestions.length > 0) setShowAnalytics(true);
-      })
-      .finally(() => setLoading(false));
-  }, []);
+    if (params.get('new') === '1') { openNew(); params.delete('new'); setParams(params, { replace: true }); }
+  }, [params]); // eslint-disable-line react-hooks/exhaustive-deps
 
-  useEffect(() => { fetchOrders(); }, [filterStatus, filterLocation]);
+  const all = orders.data ?? [];
+  const counts = useMemo(() => ({ '': all.length, DRAFT: all.filter((o) => o.status === 'DRAFT').length, SENT: all.filter((o) => o.status === 'SENT').length, RECEIVED: all.filter((o) => o.status === 'RECEIVED').length }), [all]);
+  const visible = all.filter((o) => (!filterStatus || o.status === filterStatus) && (!search || o.supplier.name.toLowerCase().includes(search.toLowerCase()) || o.items.some((i) => i.productName.toLowerCase().includes(search.toLowerCase()))));
+  const sentTotal = all.filter((o) => o.status === 'SENT').reduce((s, o) => s + orderTotal(o.items), 0);
 
-  const handleAddItem = () => setForm({ ...form, items: [...form.items, emptyItem()] });
+  const suggestions = analytics.data?.suggestions ?? [];
+  const suggestionsBySupplier = useMemo(() => {
+    const m = new Map<string, typeof suggestions>();
+    suggestions.forEach((s) => { m.set(s.supplierId, [...(m.get(s.supplierId) ?? []), s]); });
+    return [...m.entries()];
+  }, [suggestions]);
 
-  const handleItemChange = (idx: number, field: keyof OrderItem, value: string | number) => {
-    const items = form.items.map((item, i) => i === idx ? { ...item, [field]: value } : item);
-    setForm({ ...form, items });
+  const openNew = (preset?: Partial<typeof form>) => {
+    setFormError('');
+    setForm({ supplierId: '', locationId: locations.data?.length === 1 ? locations.data[0].id : '', notes: '', deliveryAt: '', items: [emptyItem()], ...preset });
+    setModal(true);
   };
 
-  const handleRemoveItem = (idx: number) => {
-    setForm({ ...form, items: form.items.filter((_, i) => i !== idx) });
-  };
-
-  const handleSubmit = async (e: React.FormEvent) => {
-    e.preventDefault();
+  const submit = async (e: React.FormEvent) => {
+    e.preventDefault(); setFormError('');
+    const items = form.items.filter((i) => i.productName.trim());
+    if (!items.length) { setFormError(t('orders.needItems')); return; }
     try {
-      await createOrder({
-        supplierId: form.supplierId,
-        locationId: form.locationId,
-        items: form.items,
-        notes: form.notes || null,
-        deliveryAt: form.deliveryAt ? new Date(form.deliveryAt).toISOString() : null,
-      });
-      setShowForm(false);
-      setForm({ supplierId: '', locationId: '', notes: '', deliveryAt: '', items: [emptyItem()] });
-      fetchOrders();
-    } catch (err) { console.error(err); }
+      await create.mutateAsync({ supplierId: form.supplierId, locationId: form.locationId, items: items.map((i) => ({ ...i, quantity: Number(i.quantity), unitPrice: Number(i.unitPrice) })), notes: form.notes || null, deliveryAt: form.deliveryAt ? new Date(form.deliveryAt + 'T12:00:00').toISOString() : null });
+      toast.success(t('orders.created'));
+      setModal(false);
+    } catch (err) { setFormError(getErrorMessage(err)); }
   };
 
-  const handleStatusChange = async (id: string, status: OrderStatus) => {
-    await updateOrderStatus(id, status);
-    fetchOrders();
+  const changeStatus = async (o: Order, status: OrderStatus) => {
+    try { await setStatus.mutateAsync({ id: o.id, status }); toast.success(t(`orders.statusChanged.${status}`)); setDetail(null); }
+    catch (err) { toast.error(getErrorMessage(err)); }
+  };
+  const del = async (o: Order) => {
+    if (!(await confirm({ title: t('orders.deleteConfirm'), message: `${o.supplier.name} · ${o.location.name}`, danger: true, confirmLabel: t('common.delete') }))) return;
+    try { await remove.mutateAsync(o.id); toast.success(t('orders.deleted')); setDetail(null); } catch (err) { toast.error(getErrorMessage(err)); }
   };
 
-  const handleDelete = async (id: string) => {
-    if (!confirm(t('orders.deleteConfirm'))) return;
-    await deleteOrder(id);
-    fetchOrders();
-  };
-
-  const handleQuickOrder = async (supplierId: string, supplierName: string) => {
-    if (!selectedLocation) { alert(t('orders.selectLocation')); return; }
-    const sugs = analytics?.suggestions.filter((s) => s.supplierId === supplierId) ?? [];
-    if (sugs.length === 0) return;
+  const quickOrder = async () => {
+    if (!quick) return;
+    const items = suggestions.filter((s) => s.supplierId === quick.supplierId);
     try {
-      await createOrder({
-        supplierId,
-        locationId: selectedLocation,
-        items: sugs.map((s) => ({ productName: s.productName, quantity: s.suggestedQty, unit: s.unit, unitPrice: 0 })),
-        notes: `Comanda automàtica — ${new Date().toLocaleDateString('ca')}`,
-        deliveryAt: null,
-      });
-      setOrderSuccess(`Comanda creada per ${supplierName}`);
-      setOrderingFor(null);
-      fetchOrders();
-      setTimeout(() => setOrderSuccess(''), 4000);
-    } catch (e) { console.error(e); }
+      await create.mutateAsync({ supplierId: quick.supplierId, locationId: quick.locationId, items: items.map((s) => ({ productName: s.productName, quantity: s.suggestedQty, unit: s.unit, unitPrice: 0 })), notes: t('orders.autoNote', { date: fmtDate(new Date()) }), deliveryAt: null });
+      toast.success(t('orders.orderCreatedFor', { name: items[0]?.supplierName ?? '' }));
+      setQuick(null);
+    } catch (err) { toast.error(getErrorMessage(err)); }
   };
 
-  const totalOrder = (items: OrderItem[]) =>
-    items.reduce((sum, i) => sum + i.quantity * i.unitPrice, 0).toFixed(2);
+  const setItem = (idx: number, patch: Partial<OrderItem>) => setForm({ ...form, items: form.items.map((it, i) => (i === idx ? { ...it, ...patch } : it)) });
 
-  if (loading) return <div style={{ padding: 40, color: '#888' }}>{t('common.loading')}</div>;
-
-  const overdueCount = analytics?.supplierFrequency.filter((s) => s.overdue).length ?? 0;
+  if (locations.isLoading || suppliers.isLoading || orders.isLoading) return <PageSkeleton />;
 
   return (
     <div>
-      <Header
-        title={t('orders.title')}
-        subtitle={t('orders.subtitle')}
-        action={
-          <div style={{ display: 'flex', gap: 10, alignItems: 'center' }}>
-            {overdueCount > 0 && (
-              <button
-                style={{ ...styles.alertBtn, ...(showAnalytics ? styles.alertBtnActive : {}) }}
-                onClick={() => setShowAnalytics(!showAnalytics)}
-              >
-                {overdueCount} {overdueCount !== 1 ? t('orders.pendingPlural') : t('orders.pending')}
-              </button>
-            )}
-            <button style={styles.primaryBtn} onClick={() => setShowForm(!showForm)}>
-              {showForm ? t('orders.cancel') : t('orders.newOrder')}
-            </button>
-          </div>
-        }
-      />
+      <PageHeader title={t('orders.title')} subtitle={t('orders.subtitle')}
+        actions={canManage && <Button variant="primary" icon="plus" onClick={() => openNew()}>{t('orders.newOrder')}</Button>} />
 
-      {/* ── Panell suggeriments ─────────────────────────────────────────── */}
-      {showAnalytics && analytics && analytics.suggestions.length > 0 && (
-        <div style={styles.analyticsPanel}>
-          <div style={styles.analyticsPanelHeader}>
-            <span style={styles.analyticsPanelTitle}>{t('orders.recommendedOrders')}</span>
-            <span style={styles.analyticsPanelSub}>{t('orders.overdueSubtitle')}</span>
-          </div>
+      <div className="grid-kpi mb-5">
+        <div className="card stat"><span className="stat-label">{t('orders.status.DRAFT')}</span><span className="stat-value">{fmtNum(counts.DRAFT)}</span></div>
+        <div className="card stat"><span className="stat-label">{t('orders.status.SENT')}</span><span className="stat-value">{fmtNum(counts.SENT)}</span><span className="t-sm t-3">{t('orders.inTransitValue', { v: fmtCHF(sentTotal, { compact: true }) })}</span></div>
+        <div className="card stat"><span className="stat-label">{t('orders.status.RECEIVED')}</span><span className="stat-value">{fmtNum(counts.RECEIVED)}</span></div>
+        <div className="card stat"><span className="stat-label">{t('orders.overdueSuppliers')}</span><span className={`stat-value${suggestionsBySupplier.length ? ' t-warning' : ''}`}>{fmtNum(suggestionsBySupplier.length)}</span></div>
+      </div>
 
-          {orderSuccess && <div style={styles.successBanner}>{orderSuccess}</div>}
-
-          <div style={styles.quickOrderBar}>
-            <span style={styles.label}>{t('orders.destinationLocation')}</span>
-            <select style={styles.filterSelect} value={selectedLocation} onChange={(e) => setSelectedLocation(e.target.value)}>
-              <option value="">{t('orders.selectLocation')}</option>
-              {locations.map((l) => <option key={l.id} value={l.id}>{l.name}</option>)}
-            </select>
-          </div>
-
-          {Array.from(new Set(analytics.suggestions.map((s) => s.supplierId))).map((supId) => {
-            const supSuggestions = analytics.suggestions.filter((s) => s.supplierId === supId);
-            const supName = supSuggestions[0].supplierName;
-            const sup = analytics.supplierFrequency.find((sf) => sf.supplierId === supId);
-            return (
-              <div key={supId} style={styles.suggestionBlock}>
-                <div style={styles.suggestionRow}>
-                  <div>
-                    <span style={styles.supplierName}>{supName}</span>
-                    {sup && <span style={styles.overdueTag}>Fa {sup.daysSinceLast} dies · habitual cada {sup.avgIntervalDays}d</span>}
-                    <div style={styles.suggestionItems}>
-                      {supSuggestions.map((s, i) => (
-                        <span key={i} style={styles.suggestionChip}>{s.productName} · {s.suggestedQty} {s.unit}</span>
-                      ))}
+      {suggestionsBySupplier.length > 0 && canManage && (
+        <Card warm className="mb-5">
+          <CardHead title={<span className="row gap-2"><Icon name="sparkles" size={16} />{t('orders.recommendedOrders')}</span>} sub={t('orders.overdueSubtitle')}
+            action={<Button size="sm" variant="ghost" icon={showRecs ? 'chevronDown' : 'chevronRight'} onClick={() => setShowRecs(!showRecs)}>{showRecs ? t('common.hide') : t('common.show')}</Button>} />
+          {showRecs && (
+            <div className="col gap-3">
+              {suggestionsBySupplier.map(([supId, sugs]) => {
+                const freq = analytics.data?.supplierFrequency.find((f) => f.supplierId === supId);
+                const isQuick = quick?.supplierId === supId;
+                return (
+                  <div key={supId} className="card card-pad-sm col gap-3">
+                    <div className="row between" style={{ flexWrap: 'wrap', gap: 10 }}>
+                      <div>
+                        <div className="t-strong row gap-2"><Icon name="truck" size={15} />{sugs[0].supplierName}</div>
+                        {freq && <div className="t-xs t-warning mt-2">{t('orders.daysAgo', { n: freq.daysSinceLast, avg: freq.avgIntervalDays })}</div>}
+                      </div>
+                      {isQuick ? (
+                        <div className="row-wrap">
+                          <Select small value={quick.locationId} onChange={(e) => setQuick({ ...quick, locationId: e.target.value })}>
+                            <option value="">{t('orders.selectLocation')}</option>
+                            {locations.data?.map((l) => <option key={l.id} value={l.id}>{l.name}</option>)}
+                          </Select>
+                          <Button size="sm" variant="primary" icon="check" disabled={!quick.locationId} loading={create.isPending} onClick={quickOrder}>{t('orders.confirm')}</Button>
+                          <Button size="sm" variant="ghost" onClick={() => setQuick(null)}>{t('common.cancel')}</Button>
+                        </div>
+                      ) : (
+                        <div className="row gap-2">
+                          <Button size="sm" variant="secondary" icon="edit" onClick={() => openNew({ supplierId: supId, items: sugs.map((s) => ({ productName: s.productName, quantity: s.suggestedQty, unit: s.unit, unitPrice: 0 })) })}>{t('orders.customize')}</Button>
+                          <Button size="sm" variant="primary" icon="sparkles" onClick={() => setQuick({ supplierId: supId, locationId: locations.data?.length === 1 ? locations.data[0].id : '' })}>{t('orders.quickOrder')}</Button>
+                        </div>
+                      )}
                     </div>
+                    <div className="row-wrap" style={{ gap: 5 }}>{sugs.map((s, i) => <span key={i} className="chip" style={{ height: 24, fontSize: 11.5 }}>{s.productName} · <b>{s.suggestedQty} {s.unit}</b></span>)}</div>
                   </div>
-                  {orderingFor === supId ? (
-                    <div style={{ display: 'flex', gap: 8, flexShrink: 0 }}>
-                      <button style={styles.confirmBtn} onClick={() => handleQuickOrder(supId, supName)}>{t('orders.confirm')}</button>
-                      <button style={styles.cancelBtn} onClick={() => setOrderingFor(null)}>{t('orders.cancel')}</button>
-                    </div>
-                  ) : (
-                    <button style={styles.quickOrderBtn} onClick={() => setOrderingFor(supId)}>{t('orders.quickOrder')}</button>
-                  )}
+                );
+              })}
+            </div>
+          )}
+        </Card>
+      )}
+
+      <div className="toolbar">
+        <div className="pipeline">
+          {(['', ...STATUSES] as const).map((s) => (
+            <button key={s} className="pipe" aria-pressed={filterStatus === s} onClick={() => setFilterStatus(s)}>
+              {s ? t(`orders.status.${s}`) : t('orders.allStatuses')}<span className="n">{counts[s]}</span>
+            </button>
+          ))}
+        </div>
+        <div className="grow" />
+        <Select small value={filterLocation} onChange={(e) => setFilterLocation(e.target.value)}>
+          <option value="">{t('orders.allLocations')}</option>
+          {locations.data?.map((l) => <option key={l.id} value={l.id}>{l.name}</option>)}
+        </Select>
+        <div className="search"><Icon name="search" /><Input small placeholder={t('orders.search')} value={search} onChange={(e) => setSearch(e.target.value)} /></div>
+      </div>
+
+      {visible.length === 0 ? <Card><EmptyState icon="package" title={t('orders.noOrders')} action={canManage && <Button icon="plus" onClick={() => openNew()}>{t('orders.newOrder')}</Button>} /></Card> : (
+        <div className="grid-auto-lg">
+          {visible.map((o) => (
+            <Card key={o.id} hover className="col gap-3" onClick={() => setDetail(o)} style={{ cursor: 'pointer' }}>
+              <div className="row between" style={{ alignItems: 'flex-start' }}>
+                <div style={{ minWidth: 0 }}>
+                  <div className="t-strong t-truncate" style={{ fontSize: 15 }}>{o.supplier.name}</div>
+                  <div className="t-sm t-3 t-truncate row gap-2"><Icon name="mapPin" size={12} />{o.location.name}</div>
                 </div>
+                <Badge tone={STATUS_COLOR[o.status]} dot>{t(`orders.status.${o.status}`)}</Badge>
               </div>
-            );
-          })}
+              <div className="row-wrap" style={{ gap: 5 }}>
+                {o.items.slice(0, 4).map((it, i) => <span key={i} className="chip" style={{ height: 24, fontSize: 11.5 }}>{it.productName} · {it.quantity} {it.unit}</span>)}
+                {o.items.length > 4 && <span className="chip" style={{ height: 24, fontSize: 11.5 }}>+{o.items.length - 4}</span>}
+              </div>
+              <div className="row between t-sm" style={{ paddingTop: 10, borderTop: '1px solid var(--border)' }}>
+                <span className="t-3">{fmtDate(o.createdAt)}{o.deliveryAt && <> · <Icon name="truck" size={12} style={{ display: 'inline', verticalAlign: '-2px' }} /> {fmtDate(o.deliveryAt)}</>}</span>
+                <span className="t-strong t-num">{fmtCHF(orderTotal(o.items))}</span>
+              </div>
+              {canManage && o.status !== 'RECEIVED' && (
+                <div className="row gap-2" onClick={(e) => e.stopPropagation()}>
+                  {o.status === 'DRAFT' && <Button size="sm" variant="primary" icon="send" onClick={() => changeStatus(o, 'SENT')}>{t('orders.send')}</Button>}
+                  {o.status === 'SENT' && <Button size="sm" variant="success" icon="check" onClick={() => changeStatus(o, 'RECEIVED')}>{t('orders.markReceived')}</Button>}
+                  <Button size="sm" variant="ghost" icon="trash" onClick={() => del(o)} aria-label={t('common.delete')} />
+                </div>
+              )}
+            </Card>
+          ))}
         </div>
       )}
 
-      {/* ── Formulari nova comanda ───────────────────────────────────────── */}
-      {showForm && (
-        <div style={styles.formCard}>
-          <h3 style={styles.formTitle}>{t('orders.newOrderForm')}</h3>
-          <form onSubmit={handleSubmit}>
-            <div style={styles.formRow}>
-              <div style={styles.field}>
-                <label style={styles.label}>{t('orders.supplier')}</label>
-                <select style={styles.input} value={form.supplierId} onChange={(e) => setForm({ ...form, supplierId: e.target.value })} required>
-                  <option value="">{t('orders.selectSupplier')}</option>
-                  {suppliers.map((s) => <option key={s.id} value={s.id}>{s.name}</option>)}
-                </select>
-              </div>
-              <div style={styles.field}>
-                <label style={styles.label}>{t('schedules.location')}</label>
-                <select style={styles.input} value={form.locationId} onChange={(e) => setForm({ ...form, locationId: e.target.value })} required>
-                  <option value="">{t('orders.selectLocation')}</option>
-                  {locations.map((l) => <option key={l.id} value={l.id}>{l.name}</option>)}
-                </select>
-              </div>
-              <div style={styles.field}>
-                <label style={styles.label}>{t('orders.deliveryDate')}</label>
-                <input type="date" style={styles.input} value={form.deliveryAt} onChange={(e) => setForm({ ...form, deliveryAt: e.target.value })} />
-              </div>
+      {/* ── Detail modal ── */}
+      <Modal open={!!detail} onClose={() => setDetail(null)} title={detail?.supplier.name ?? ''} description={detail ? `${detail.location.name} · ${fmtDate(detail.createdAt, 'd MMM yyyy')} · ${relativeDays(Math.round((Date.now() - new Date(detail.createdAt).getTime()) / 86400000))}` : ''}
+        footer={detail && canManage && (
+          <>
+            {detail.status !== 'RECEIVED' && <Button variant="danger-outline" icon="trash" onClick={() => del(detail)} style={{ marginRight: 'auto' }}>{t('common.delete')}</Button>}
+            {detail.status === 'DRAFT' && <Button variant="primary" icon="send" onClick={() => changeStatus(detail, 'SENT')}>{t('orders.send')}</Button>}
+            {detail.status === 'SENT' && <Button variant="success" icon="check" onClick={() => changeStatus(detail, 'RECEIVED')}>{t('orders.markReceived')}</Button>}
+          </>
+        )}>
+        {detail && (
+          <div className="col gap-4">
+            <div className="row gap-2"><Badge tone={STATUS_COLOR[detail.status]} dot>{t(`orders.status.${detail.status}`)}</Badge>{detail.deliveryAt && <Badge><Icon name="truck" size={12} />{t('orders.deliveryDate')}: {fmtDate(detail.deliveryAt)}</Badge>}</div>
+            <div className="table-wrap">
+              <table className="table">
+                <thead><tr><th>{t('orders.productName')}</th><th className="num">{t('orders.qty')}</th><th className="num">{t('orders.pricePerUnit')}</th><th className="num">{t('orders.total')}</th></tr></thead>
+                <tbody>
+                  {detail.items.map((it, i) => <tr key={i}><td>{it.productName}</td><td className="num">{it.quantity} {it.unit}</td><td className="num">{fmtCHF(it.unitPrice)}</td><td className="num t-strong">{fmtCHF(it.quantity * it.unitPrice)}</td></tr>)}
+                  <tr><td colSpan={3} className="t-strong" style={{ textAlign: 'right' }}>{t('orders.total')}</td><td className="num t-strong" style={{ fontSize: 15 }}>{fmtCHF(orderTotal(detail.items))}</td></tr>
+                </tbody>
+              </table>
             </div>
+            {detail.notes && <div className="notice notice-info"><Icon name="info" /><span>{detail.notes}</span></div>}
+          </div>
+        )}
+      </Modal>
 
-            <div style={styles.itemsSection}>
-              <div style={styles.itemsHeader}>
-                <span style={styles.label}>{t('orders.products')}</span>
-                <button type="button" style={styles.addItemBtn} onClick={handleAddItem}>{t('orders.addProduct')}</button>
-              </div>
-              {form.items.map((item, idx) => (
-                <div key={idx} style={styles.itemRow}>
-                  <input style={{ ...styles.input, flex: 2 }} placeholder={t('orders.productName')} value={item.productName}
-                    onChange={(e) => handleItemChange(idx, 'productName', e.target.value)} required />
-                  <input style={{ ...styles.input, width: 70 }} type="number" placeholder={t('orders.qty')} value={item.quantity}
-                    onChange={(e) => handleItemChange(idx, 'quantity', parseFloat(e.target.value))} min="0.01" step="0.01" required />
-                  <input style={{ ...styles.input, width: 60 }} placeholder={t('orders.unit')} value={item.unit}
-                    onChange={(e) => handleItemChange(idx, 'unit', e.target.value)} required />
-                  <input style={{ ...styles.input, width: 80 }} type="number" placeholder={t('orders.pricePerUnit')} value={item.unitPrice}
-                    onChange={(e) => handleItemChange(idx, 'unitPrice', parseFloat(e.target.value))} min="0" step="0.01" required />
-                  {form.items.length > 1 && (
-                    <button type="button" style={styles.removeBtn} onClick={() => handleRemoveItem(idx)}>×</button>
-                  )}
+      {/* ── New order modal ── */}
+      <Modal open={modal} onClose={() => setModal(false)} size="lg" title={t('orders.newOrderForm')}
+        footer={<><span className="t-sm t-3" style={{ marginRight: 'auto' }}>{t('orders.total')}: <b className="t-2" style={{ fontSize: 15 }}>{fmtCHF(orderTotal(form.items))}</b></span><Button variant="ghost" onClick={() => setModal(false)}>{t('common.cancel')}</Button><Button variant="primary" type="submit" form="order-form" icon="check" loading={create.isPending}>{t('orders.createOrder')}</Button></>}>
+        <form id="order-form" onSubmit={submit} className="col gap-4">
+          <div className="form-grid">
+            <Field label={t('orders.supplier')} required>
+              <Select value={form.supplierId} onChange={(e) => setForm({ ...form, supplierId: e.target.value })} required autoFocus>
+                <option value="">{t('orders.selectSupplier')}</option>
+                {suppliers.data?.map((s) => <option key={s.id} value={s.id}>{s.name}</option>)}
+              </Select>
+            </Field>
+            <Field label={t('schedules.location')} required>
+              <Select value={form.locationId} onChange={(e) => setForm({ ...form, locationId: e.target.value })} required>
+                <option value="">{t('orders.selectLocation')}</option>
+                {locations.data?.map((l) => <option key={l.id} value={l.id}>{l.name}</option>)}
+              </Select>
+            </Field>
+            <Field label={t('orders.deliveryDate')}><Input type="date" value={form.deliveryAt} onChange={(e) => setForm({ ...form, deliveryAt: e.target.value })} /></Field>
+          </div>
+          <div>
+            <div className="row between mb-2"><span className="label">{t('orders.products')}</span><Button size="sm" variant="ghost" icon="plus" onClick={() => setForm({ ...form, items: [...form.items, emptyItem()] })}>{t('orders.addProduct')}</Button></div>
+            <div className="col gap-2">
+              {form.items.map((it, idx) => (
+                <div key={idx} className="row gap-2" style={{ flexWrap: 'wrap' }}>
+                  <Input small placeholder={t('orders.productName')} value={it.productName} onChange={(e) => setItem(idx, { productName: e.target.value })} style={{ flex: '2 1 160px' }} list="product-suggestions" />
+                  <Input small type="number" min="0.01" step="0.01" value={it.quantity} onChange={(e) => setItem(idx, { quantity: Number(e.target.value) })} style={{ width: 80 }} aria-label={t('orders.qty')} />
+                  <Select small value={it.unit} onChange={(e) => setItem(idx, { unit: e.target.value })} style={{ width: 84 }}>{UNITS.map((u) => <option key={u}>{u}</option>)}</Select>
+                  <Input small type="number" min="0" step="0.01" value={it.unitPrice} onChange={(e) => setItem(idx, { unitPrice: Number(e.target.value) })} style={{ width: 100 }} addon="CHF" aria-label={t('orders.pricePerUnit')} />
+                  <span className="t-sm t-num t-3" style={{ width: 90, textAlign: 'right' }}>{fmtCHF(it.quantity * it.unitPrice)}</span>
+                  <Button size="sm" variant="ghost" icon="x" disabled={form.items.length === 1} onClick={() => setForm({ ...form, items: form.items.filter((_, i) => i !== idx) })} aria-label={t('common.delete')} />
                 </div>
               ))}
             </div>
-
-            <div style={styles.field}>
-              <label style={styles.label}>{t('schedules.notes')}</label>
-              <input type="text" style={styles.input} value={form.notes} onChange={(e) => setForm({ ...form, notes: e.target.value })} placeholder={t('schedules.optional')} />
-            </div>
-
-            <div style={{ marginTop: 16 }}>
-              <button type="submit" style={styles.primaryBtn}>{t('orders.createOrder')}</button>
-            </div>
-          </form>
-        </div>
-      )}
-
-      {/* ── Filtres ──────────────────────────────────────────────────────── */}
-      <div style={styles.filters}>
-        <select style={styles.filterSelect} value={filterStatus} onChange={(e) => setFilterStatus(e.target.value as OrderStatus | '')}>
-          <option value="">{t('orders.allStatuses')}</option>
-          {Object.entries(STATUS_LABELS).map(([k, v]) => <option key={k} value={k}>{v}</option>)}
-        </select>
-        <select style={styles.filterSelect} value={filterLocation} onChange={(e) => setFilterLocation(e.target.value)}>
-          <option value="">{t('orders.allLocations')}</option>
-          {locations.map((l) => <option key={l.id} value={l.id}>{l.name}</option>)}
-        </select>
-      </div>
-
-      {/* ── Llista de comandes ───────────────────────────────────────────── */}
-      <div style={styles.ordersList}>
-        {orders.length === 0 ? (
-          <p style={styles.empty}>{t('orders.noOrders')}</p>
-        ) : (
-          orders.map((order) => (
-            <div key={order.id} style={styles.orderCard}>
-              <div style={styles.orderHeader}>
-                <div>
-                  <span style={styles.supplierNameBig}>{order.supplier.name}</span>
-                  <span style={styles.locationName}>{order.location.name}</span>
-                </div>
-                <div style={styles.orderMeta}>
-                  <span style={{ ...styles.statusBadge, backgroundColor: STATUS_COLORS[order.status] + '20', color: STATUS_COLORS[order.status] }}>
-                    {STATUS_LABELS[order.status]}
-                  </span>
-                  <span style={styles.orderDate}>{format(new Date(order.createdAt), 'd MMM yyyy')}</span>
-                </div>
-              </div>
-
-              <div style={styles.orderItems}>
-                {(order.items as OrderItem[]).map((item, i) => (
-                  <span key={i} style={styles.itemChip}>
-                    {item.productName} · {item.quantity} {item.unit}
-                  </span>
-                ))}
-              </div>
-
-              <div style={styles.orderFooter}>
-                <span style={styles.orderTotal}>{t('orders.total')} {totalOrder(order.items as OrderItem[])}</span>
-                <div style={styles.orderActions}>
-                  {order.status === 'DRAFT' && (
-                    <button style={styles.actionBtn} onClick={() => handleStatusChange(order.id, 'SENT')}>{t('orders.send')}</button>
-                  )}
-                  {order.status === 'SENT' && (
-                    <button style={{ ...styles.actionBtn, backgroundColor: '#5aab7a', color: '#fff', borderColor: '#5aab7a' }}
-                      onClick={() => handleStatusChange(order.id, 'RECEIVED')}>{t('orders.markReceived')}</button>
-                  )}
-                  {order.status !== 'RECEIVED' && (
-                    <button style={styles.deleteBtn} onClick={() => handleDelete(order.id)}>{t('orders.delete')}</button>
-                  )}
-                </div>
-              </div>
-            </div>
-          ))
-        )}
-      </div>
+            <datalist id="product-suggestions">{analytics.data?.topProducts.map((p) => <option key={p.name} value={p.name} />)}</datalist>
+          </div>
+          <Field label={t('schedules.notes')}><Textarea value={form.notes} onChange={(e) => setForm({ ...form, notes: e.target.value })} placeholder={t('orders.notesPlaceholder')} style={{ minHeight: 60 }} /></Field>
+          {formError && <div className="error-box">{formError}</div>}
+        </form>
+      </Modal>
     </div>
   );
 }
-
-const styles: Record<string, React.CSSProperties> = {
-  primaryBtn: { padding: '9px 18px', backgroundColor: '#2D3250', color: '#F4E285', border: 'none', borderRadius: 8, fontSize: 13, fontWeight: 700, cursor: 'pointer' },
-  alertBtn: { padding: '8px 14px', backgroundColor: '#fff3cd', color: '#92400e', border: '1.5px solid #F4E285', borderRadius: 8, fontSize: 12, fontWeight: 700, cursor: 'pointer' },
-  alertBtnActive: { backgroundColor: '#F4E285', color: '#2D3250' },
-  formCard: { backgroundColor: '#fff', borderRadius: 12, padding: '20px 24px', marginBottom: 20, boxShadow: '0 1px 6px rgba(45,50,80,0.07)' },
-  formTitle: { fontSize: 14, fontWeight: 700, margin: '0 0 16px', color: '#2D3250' },
-  formRow: { display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(180px, 1fr))', gap: 14, marginBottom: 16 },
-  field: { display: 'flex', flexDirection: 'column', gap: 4, marginBottom: 12 },
-  label: { fontSize: 12, fontWeight: 600, color: '#666' },
-  input: { padding: '8px 10px', border: '1.5px solid #e2ddd5', borderRadius: 6, fontSize: 13, outline: 'none', backgroundColor: '#faf9f7' },
-  itemsSection: { marginBottom: 16 },
-  itemsHeader: { display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 8 },
-  addItemBtn: { fontSize: 12, color: '#4f7bdb', background: 'transparent', border: 'none', cursor: 'pointer', fontWeight: 600 },
-  itemRow: { display: 'flex', gap: 8, alignItems: 'center', marginBottom: 8, flexWrap: 'wrap' },
-  removeBtn: { background: 'transparent', border: 'none', color: '#c0392b', cursor: 'pointer', fontSize: 18 },
-  filters: { display: 'flex', gap: 12, marginBottom: 20, flexWrap: 'wrap' },
-  filterSelect: { padding: '7px 10px', border: '1.5px solid #e2ddd5', borderRadius: 6, fontSize: 13, outline: 'none', backgroundColor: '#fff' },
-  ordersList: { display: 'flex', flexDirection: 'column', gap: 12 },
-  empty: { color: '#aaa', fontSize: 13 },
-  orderCard: { backgroundColor: '#fff', borderRadius: 12, padding: '16px 20px', boxShadow: '0 1px 4px rgba(45,50,80,0.06)' },
-  orderHeader: { display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: 10 },
-  supplierNameBig: { fontSize: 15, fontWeight: 700, color: '#2D3250', display: 'block' },
-  locationName: { fontSize: 12, color: '#999', display: 'block', marginTop: 2 },
-  orderMeta: { display: 'flex', flexDirection: 'column', alignItems: 'flex-end', gap: 4 },
-  statusBadge: { fontSize: 11, fontWeight: 700, padding: '3px 8px', borderRadius: 20, textTransform: 'uppercase' },
-  orderDate: { fontSize: 11, color: '#bbb' },
-  orderItems: { display: 'flex', flexWrap: 'wrap', gap: 6, marginBottom: 12 },
-  itemChip: { fontSize: 11, backgroundColor: '#F5F3EC', borderRadius: 20, padding: '3px 10px', color: '#666' },
-  orderFooter: { display: 'flex', justifyContent: 'space-between', alignItems: 'center' },
-  orderTotal: { fontSize: 14, fontWeight: 700, color: '#2D3250' },
-  orderActions: { display: 'flex', gap: 8 },
-  actionBtn: { padding: '6px 14px', border: '1.5px solid #2D3250', borderRadius: 6, background: 'transparent', color: '#2D3250', fontSize: 12, cursor: 'pointer', fontWeight: 600 },
-  deleteBtn: { padding: '6px 14px', border: '1.5px solid #c0392b', borderRadius: 6, background: 'transparent', color: '#c0392b', fontSize: 12, cursor: 'pointer' },
-  // Analytics panel
-  analyticsPanel: { backgroundColor: '#fffbea', border: '1.5px solid #F4E285', borderRadius: 12, padding: '16px 20px', marginBottom: 20 },
-  analyticsPanelHeader: { marginBottom: 12 },
-  analyticsPanelTitle: { fontSize: 14, fontWeight: 700, color: '#2D3250', display: 'block' },
-  analyticsPanelSub: { fontSize: 11, color: '#a08a00', display: 'block', marginTop: 2 },
-  successBanner: { backgroundColor: '#d1fae5', color: '#065f46', padding: '8px 14px', borderRadius: 8, marginBottom: 12, fontWeight: 600, fontSize: 13 },
-  quickOrderBar: { display: 'flex', alignItems: 'center', gap: 12, marginBottom: 14 },
-  suggestionBlock: { backgroundColor: '#fff', border: '1px solid #f0e9c5', borderRadius: 8, padding: '12px 14px', marginBottom: 8 },
-  suggestionRow: { display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', gap: 12 },
-  supplierName: { fontSize: 13, fontWeight: 700, color: '#2D3250', display: 'block', marginBottom: 2 },
-  overdueTag: { fontSize: 11, color: '#c0392b', display: 'block', marginBottom: 6 },
-  suggestionItems: { display: 'flex', flexWrap: 'wrap', gap: 5, marginTop: 6 },
-  suggestionChip: { fontSize: 11, backgroundColor: '#F5F3EC', borderRadius: 20, padding: '2px 9px', color: '#666' },
-  quickOrderBtn: { padding: '6px 14px', border: '1.5px solid #2D3250', borderRadius: 6, background: 'transparent', color: '#2D3250', fontSize: 12, cursor: 'pointer', fontWeight: 600, whiteSpace: 'nowrap', flexShrink: 0 },
-  confirmBtn: { padding: '6px 14px', border: 'none', borderRadius: 6, background: '#2D3250', color: '#F4E285', fontSize: 12, cursor: 'pointer', fontWeight: 700 },
-  cancelBtn: { padding: '6px 14px', border: '1.5px solid #ddd', borderRadius: 6, background: 'transparent', color: '#888', fontSize: 12, cursor: 'pointer' },
-};

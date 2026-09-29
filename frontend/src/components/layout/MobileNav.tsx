@@ -1,84 +1,54 @@
-import { NavLink } from 'react-router-dom';
+import { NavLink, useLocation, useNavigate } from 'react-router-dom';
 import { useTranslation } from 'react-i18next';
-
-const NAV_ITEMS = [
-  { to: '/', end: true, key: 'nav.home' },
-  { to: '/horaris',     end: false, key: 'nav.schedules' },
-  { to: '/empleats',    end: false, key: 'nav.employees' },
-  { to: '/comandes',    end: false, key: 'nav.orders' },
-  { to: '/caixa',       end: false, key: 'nav.cash' },
-  { to: '/planificacio',end: false, key: 'nav.planning' },
-];
+import { useState } from 'react';
+import { MOBILE_PRIMARY, MOBILE_MORE } from './nav';
+import Icon from '../ui/Icon';
+import Modal from '../ui/Modal';
+import { useAuthStore } from '../../store/authStore';
+import { cn } from '../../lib/cn';
+import LangSwitcher from './LangSwitcher';
+import ThemeToggle from './ThemeToggle';
 
 export default function MobileNav() {
   const { t } = useTranslation();
+  const [more, setMore] = useState(false);
+  const loc = useLocation();
+  const navigate = useNavigate();
+  const logout = useAuthStore((s) => s.logout);
+  const moreActive = MOBILE_MORE.some((m) => loc.pathname.startsWith(m.to));
+
   return (
-    <nav style={styles.bar}>
-      {NAV_ITEMS.map((item) => (
-        <NavLink
-          key={item.to}
-          to={item.to}
-          end={item.end}
-          style={({ isActive }) => ({
-            ...styles.item,
-            ...(isActive ? styles.itemActive : {}),
-          })}
-        >
-          {({ isActive }) => (
-            <>
-              <span style={{ ...styles.dot, opacity: isActive ? 1 : 0 }} />
-              <span style={styles.label}>{t(item.key)}</span>
-            </>
-          )}
-        </NavLink>
-      ))}
-    </nav>
+    <>
+      <nav className="mnav">
+        {MOBILE_PRIMARY.map((item) => (
+          <NavLink key={item.to} to={item.to} end={item.end} className="mnav-item">
+            <Icon name={item.icon} />
+            <span>{t(item.key)}</span>
+          </NavLink>
+        ))}
+        <button className={cn('mnav-item', moreActive && 'active')} onClick={() => setMore(true)}>
+          <Icon name="more" />
+          <span>{t('nav.more')}</span>
+        </button>
+      </nav>
+
+      <Modal open={more} onClose={() => setMore(false)} title={t('nav.more')}>
+        <div className="col gap-2">
+          {MOBILE_MORE.map((item) => (
+            <button key={item.to} className="dropdown-item" style={{ padding: '12px 10px', fontSize: 14 }} onClick={() => { setMore(false); navigate(item.to); }}>
+              <Icon name={item.icon} />{t(item.key)}
+            </button>
+          ))}
+          <hr className="divider" />
+          <div className="row gap-3" style={{ padding: '6px 0' }}>
+            <LangSwitcher className="btn btn-secondary" compact />
+            <ThemeToggle className="btn btn-secondary" withLabel />
+            <button className="btn btn-ghost" style={{ marginLeft: 'auto' }} onClick={() => { logout(); navigate('/login'); }}>
+              <Icon name="logout" />{t('common.logout')}
+            </button>
+          </div>
+        </div>
+      </Modal>
+    </>
   );
 }
-
-const styles: Record<string, React.CSSProperties> = {
-  bar: {
-    position: 'fixed',
-    bottom: 0,
-    left: 0,
-    right: 0,
-    height: 60,
-    backgroundColor: '#2D3250',
-    display: 'flex',
-    zIndex: 100,
-    borderTop: '1px solid rgba(255,255,255,0.06)',
-    paddingBottom: 'env(safe-area-inset-bottom)',
-  },
-  item: {
-    flex: 1,
-    display: 'flex',
-    flexDirection: 'column',
-    alignItems: 'center',
-    justifyContent: 'center',
-    gap: 3,
-    textDecoration: 'none',
-    color: '#5A6480',
-    fontSize: 9.5,
-    fontWeight: 600,
-    letterSpacing: '0.2px',
-    textTransform: 'uppercase',
-    transition: 'color 0.12s',
-    padding: '6px 2px',
-  },
-  itemActive: {
-    color: '#F4E285',
-  },
-  dot: {
-    width: 4,
-    height: 4,
-    borderRadius: '50%',
-    backgroundColor: '#F4E285',
-    transition: 'opacity 0.12s',
-  },
-  label: {
-    maxWidth: 52,
-    overflow: 'hidden',
-    textOverflow: 'ellipsis',
-    whiteSpace: 'nowrap',
-  },
-};

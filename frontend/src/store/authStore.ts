@@ -33,3 +33,6 @@ export const useAuthStore = create<AuthState>()(
     }
   )
 );
+
+/** OWNER and MANAGER can write; EMPLOYEE is read-only except for their own requests. */
+export const useCanManage = () => useAuthStore((s) => s.user?.role === 'OWNER' || s.user?.role === 'MANAGER');

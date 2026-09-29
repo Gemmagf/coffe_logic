@@ -281,7 +281,7 @@ async function main() {
       const cashSales = Math.round((sales - cardSales) * 100) / 100;
       const expenses = isWeekend ? 25 : 15 + (Math.abs(dOff) % 3) * 8;
       const discrepancy = (seed % 9 === 0) ? -4.5 : (seed % 7 === 0) ? 2.0 : 0;
-      const closing = Math.round((200 + sales - expenses + discrepancy) * 100) / 100;
+      const closing = Math.round((200 + cashSales - expenses + discrepancy) * 100) / 100; // drawer holds cash only
       const notes = dOff === -7 && loc.id === loc1.id ? 'TPV avariat a la tarda, algunes vendes en efectiu.'
         : dOff === -3 && loc.id === loc2.id ? 'Mercat proper, +20% clients.'
         : undefined;

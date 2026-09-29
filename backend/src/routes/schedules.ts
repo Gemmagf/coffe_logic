@@ -17,7 +17,27 @@ const ScheduleSchema = z.object({
   startTime: z.string().regex(TimeRegex, "Format d'hora invàlid (HH:MM)"),
   endTime: z.string().regex(TimeRegex, "Format d'hora invàlid (HH:MM)"),
   notes: z.string().optional().nullable(),
+}).refine((d) => d.startTime < d.endTime, {
+  message: "L'hora de sortida ha de ser posterior a l'hora d'entrada",
+  path: ['endTime'],
 });
+
+/** Rejects a shift that overlaps another shift of the same employee on the same day. */
+async function assertNoOverlap(employeeId: string, date: string, startTime: string, endTime: string, excludeId?: string) {
+  const conflict = await prisma.schedule.findFirst({
+    where: {
+      employeeId,
+      date,
+      ...(excludeId && { id: { not: excludeId } }),
+      startTime: { lt: endTime },
+      endTime: { gt: startTime },
+    },
+    include: { location: { select: { name: true } } },
+  });
+  if (conflict) {
+    throw createError(`Aquest empleat ja té un torn de ${conflict.startTime} a ${conflict.endTime} (${conflict.location.name}) aquest dia`, 409);
+  }
+}
 
 // GET /api/schedules
 router.get('/', async (req: AuthRequest, res: Response, next: NextFunction) => {
@@ -59,6 +79,7 @@ router.post('/', authorize('OWNER', 'MANAGER'), async (req: AuthRequest, res: Re
     ]);
     if (!employee) throw createError('Empleat no trobat', 404);
     if (!location) throw createError('Local no trobat', 404);
+    await assertNoOverlap(body.employeeId, body.date, body.startTime, body.endTime);
 
     const schedule = await prisma.schedule.create({
       data: body,
@@ -92,6 +113,7 @@ router.put('/:id', authorize('OWNER', 'MANAGER'), async (req: AuthRequest, res: 
     const body = ScheduleSchema.parse(req.body);
     const existing = await prisma.schedule.findFirst({ where: { id: req.params.id, employee: { groupId: req.user!.groupId } } });
     if (!existing) throw createError('Torn no trobat', 404);
+    await assertNoOverlap(body.employeeId, body.date, body.startTime, body.endTime, existing.id);
 
     const schedule = await prisma.schedule.update({
       where: { id: req.params.id },
@@ -108,9 +130,12 @@ router.put('/:id', authorize('OWNER', 'MANAGER'), async (req: AuthRequest, res: 
 // PATCH /api/schedules/:id
 router.patch('/:id', authorize('OWNER', 'MANAGER'), async (req: AuthRequest, res: Response, next: NextFunction) => {
   try {
-    const body = ScheduleSchema.partial().parse(req.body);
+    const body = ScheduleSchema.innerType().partial().parse(req.body);
     const existing = await prisma.schedule.findFirst({ where: { id: req.params.id, employee: { groupId: req.user!.groupId } } });
     if (!existing) throw createError('Torn no trobat', 404);
+    const merged = { ...existing, ...body };
+    if (merged.startTime >= merged.endTime) throw createError("L'hora de sortida ha de ser posterior a l'hora d'entrada", 400);
+    await assertNoOverlap(merged.employeeId, merged.date, merged.startTime, merged.endTime, existing.id);
 
     const schedule = await prisma.schedule.update({
       where: { id: req.params.id },

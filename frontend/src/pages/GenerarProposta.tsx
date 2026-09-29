@@ -1,690 +1,280 @@
-import { useEffect, useState } from 'react';
-import { addDays, format, parseISO, eachDayOfInterval, isWithinInterval } from 'date-fns';
-import { ca } from 'date-fns/locale';
+import { useMemo, useState } from 'react';
+import { addDays, eachDayOfInterval, isWithinInterval, startOfWeek } from 'date-fns';
 import { useTranslation } from 'react-i18next';
-import { getEmployees, getVacations, getPreferences } from '../api/employees';
-import { getLocations } from '../api/locations';
-import { createSchedule } from '../api/schedules';
-import type { Employee, Location, VacationRequest, ShiftPreference, DayOfWeek } from '../types';
+import Modal from '../components/ui/Modal';
+import Button from '../components/ui/Button';
+import Badge from '../components/ui/Badge';
+import Icon from '../components/ui/Icon';
+import Avatar from '../components/ui/Avatar';
+import { Field, Input } from '../components/ui/Field';
+import { useToast } from '../components/ui/Toast';
+import { useEmployees, useLocations, useVacations, usePreferences, useScheduleMutations } from '../hooks/queries';
+import { toISODate, parseLocalDate, fmtNum } from '../lib/format';
+import { fmtDate, dayLabelFromCode } from '../lib/dates';
+import { colorFor } from '../lib/colors';
+import type { DayOfWeek } from '../types';
 
-// ─── Types ────────────────────────────────────────────────────────────────────
+interface ShiftSlot { label: string; startTime: string; endTime: string }
+interface LocationConfig { locationId: string; slots: ShiftSlot[]; staffPerSlot: number }
+interface ProposedShift { employeeId: string; employeeName: string; locationId: string; locationName: string; date: string; startTime: string; endTime: string; warning?: boolean }
 
-interface ShiftSlot {
-  label: string;
-  startTime: string;
-  endTime: string;
-}
-
-interface LocationConfig {
-  locationId: string;
-  slots: ShiftSlot[];
-  staffPerSlot: number;
-}
-
-interface ProposedShift {
-  employeeId: string;
-  employeeName: string;
-  locationId: string;
-  locationName: string;
-  date: string;          // YYYY-MM-DD
-  startTime: string;
-  endTime: string;
-  warning?: string;
-}
-
-const DAY_CODE: Record<string, DayOfWeek> = {
-  '1': 'MON', '2': 'TUE', '3': 'WED', '4': 'THU', '5': 'FRI', '6': 'SAT', '0': 'SUN',
-};
-
-const PRESET_SLOTS: ShiftSlot[] = [
-  { label: 'Matí', startTime: '07:00', endTime: '15:00' },
-  { label: 'Migdia', startTime: '11:00', endTime: '19:00' },
-  { label: 'Tarda', startTime: '15:00', endTime: '23:00' },
+const DAY_CODE: Record<number, DayOfWeek> = { 1: 'MON', 2: 'TUE', 3: 'WED', 4: 'THU', 5: 'FRI', 6: 'SAT', 0: 'SUN' };
+const PRESETS = [
+  { key: 'morning', startTime: '07:00', endTime: '15:00' },
+  { key: 'midday', startTime: '11:00', endTime: '19:00' },
+  { key: 'evening', startTime: '15:00', endTime: '23:00' },
 ];
+const UNASSIGNED = '__unassigned__';
 
-// ─── Component ────────────────────────────────────────────────────────────────
-
-interface Props {
-  onClose: () => void;
-  onApplied: () => void;
-}
+interface Props { onClose: () => void; onApplied: () => void }
 
 export default function GenerarProposta({ onClose, onApplied }: Props) {
   const { t } = useTranslation();
+  const toast = useToast();
   const [step, setStep] = useState(1);
+  const employees = useEmployees();
+  const locations = useLocations();
+  const vacations = useVacations({ status: 'APPROVED' });
+  const preferences = usePreferences();
+  const { create } = useScheduleMutations();
 
-  // Dades base
-  const [employees, setEmployees] = useState<Employee[]>([]);
-  const [locations, setLocations] = useState<Location[]>([]);
-  const [vacations, setVacations] = useState<VacationRequest[]>([]);
-  const [preferences, setPreferences] = useState<ShiftPreference[]>([]);
-  const [loading, setLoading] = useState(true);
-
-  // Step 1 — Període
-  const [fromDate, setFromDate] = useState(format(new Date(), 'yyyy-MM-dd'));
-  const [toDate, setToDate] = useState(format(addDays(new Date(), 6), 'yyyy-MM-dd'));
-
-  // Step 3 — Configuració per local
-  const [locationConfigs, setLocationConfigs] = useState<LocationConfig[]>([]);
-
-  // Step 4 — Proposta generada
+  const nextMonday = startOfWeek(addDays(new Date(), 7), { weekStartsOn: 1 });
+  const [fromDate, setFromDate] = useState(toISODate(nextMonday));
+  const [toDate, setToDate] = useState(toISODate(addDays(nextMonday, 6)));
+  const [maxDaysPerWeek, setMaxDaysPerWeek] = useState(5);
+  const [configs, setConfigs] = useState<LocationConfig[] | null>(null);
   const [proposal, setProposal] = useState<ProposedShift[]>([]);
   const [applying, setApplying] = useState(false);
-  const [applyResult, setApplyResult] = useState<{ ok: number; errors: number } | null>(null);
+  const [result, setResult] = useState<{ ok: number; errors: number } | null>(null);
 
-  useEffect(() => {
-    Promise.all([getEmployees(), getLocations(), getVacations({ status: 'APPROVED' }), getPreferences()])
-      .then(([emps, locs, vacs, prefs]) => {
-        setEmployees(emps);
-        setLocations(locs);
-        setVacations(vacs);
-        setPreferences(prefs);
-        setLocationConfigs(locs.map((l) => ({
-          locationId: l.id,
-          slots: [{ ...PRESET_SLOTS[0] }],
-          staffPerSlot: 1,
-        })));
-      })
-      .finally(() => setLoading(false));
-  }, []);
+  const locationConfigs = useMemo<LocationConfig[]>(
+    () => configs ?? (locations.data ?? []).map((l) => ({ locationId: l.id, slots: [{ label: t('schedules.preset.morning'), ...PRESETS[0] }], staffPerSlot: 1 })),
+    [configs, locations.data, t],
+  );
 
-  // ── Dades derivades ────────────────────────────────────────────────────────
+  const periodDays = fromDate && toDate && fromDate <= toDate ? eachDayOfInterval({ start: parseLocalDate(fromDate), end: parseLocalDate(toDate) }) : [];
+  const vacationsDuring = (vacations.data ?? []).filter((v) => periodDays.some((d) => isWithinInterval(d, { start: parseLocalDate(v.fromDate), end: parseLocalDate(v.toDate) })));
+  const onVacation = new Set(vacationsDuring.map((v) => v.employeeId));
+  const available = (employees.data ?? []).filter((e) => !onVacation.has(e.id));
+  const prefs = preferences.data ?? [];
 
-  const periodDays = fromDate && toDate
-    ? eachDayOfInterval({ start: parseISO(fromDate), end: parseISO(toDate) })
-    : [];
-
-  const vacationsDuringPeriod = vacations.filter((v) => {
-    const vFrom = parseISO(v.fromDate);
-    const vTo = parseISO(v.toDate);
-    return periodDays.some((d) => isWithinInterval(d, { start: vFrom, end: vTo }));
-  });
-
-  const employeesOnVacation = new Set(vacationsDuringPeriod.map((v) => v.employeeId));
-  const availableEmployees = employees.filter((e) => !employeesOnVacation.has(e.id));
-
-  // ── Helpers de configuració ────────────────────────────────────────────────
-
-  const updateConfig = (locationId: string, patch: Partial<LocationConfig>) => {
-    setLocationConfigs((prev) =>
-      prev.map((c) => (c.locationId === locationId ? { ...c, ...patch } : c))
-    );
-  };
-
-  const addSlot = (locationId: string) => {
-    setLocationConfigs((prev) =>
-      prev.map((c) =>
-        c.locationId === locationId
-          ? { ...c, slots: [...c.slots, { label: t('schedules.newShiftForm'), startTime: '09:00', endTime: '17:00' }] }
-          : c
-      )
-    );
-  };
-
+  const updateConfig = (locationId: string, patch: Partial<LocationConfig>) => setConfigs(locationConfigs.map((c) => (c.locationId === locationId ? { ...c, ...patch } : c)));
   const updateSlot = (locationId: string, idx: number, patch: Partial<ShiftSlot>) => {
-    setLocationConfigs((prev) =>
-      prev.map((c) =>
-        c.locationId === locationId
-          ? { ...c, slots: c.slots.map((s, i) => (i === idx ? { ...s, ...patch } : s)) }
-          : c
-      )
-    );
+    const cfg = locationConfigs.find((c) => c.locationId === locationId)!;
+    updateConfig(locationId, { slots: cfg.slots.map((s, i) => (i === idx ? { ...s, ...patch } : s)) });
   };
 
-  const removeSlot = (locationId: string, idx: number) => {
-    setLocationConfigs((prev) =>
-      prev.map((c) =>
-        c.locationId === locationId
-          ? { ...c, slots: c.slots.filter((_, i) => i !== idx) }
-          : c
-      )
-    );
-  };
-
-  // ── Algoritme de proposta ──────────────────────────────────────────────────
-
-  const generateProposal = () => {
+  const generate = () => {
     const shifts: ProposedShift[] = [];
-    // Seguiment d'assignació: empId → set de dates ja assignades
     const assignedDates: Record<string, Set<string>> = {};
-    availableEmployees.forEach((e) => (assignedDates[e.id] = new Set()));
+    const daysThisWeek: Record<string, Record<string, number>> = {};
+    available.forEach((e) => { assignedDates[e.id] = new Set(); daysThisWeek[e.id] = {}; });
 
     for (const day of periodDays) {
-      const dateStr = format(day, 'yyyy-MM-dd');
-      // date-fns 'i' és 1=Mon…7=Sun, però getDay és 0=Sun…6=Sat
-      const jsDay = String(day.getDay()) as string;
-      const dayOfWeek = DAY_CODE[jsDay];
-
+      const dateStr = toISODate(day);
+      const weekKey = toISODate(startOfWeek(day, { weekStartsOn: 1 }));
+      const dow = DAY_CODE[day.getDay()];
       for (const cfg of locationConfigs) {
-        const loc = locations.find((l) => l.id === cfg.locationId)!;
-
+        const loc = locations.data!.find((l) => l.id === cfg.locationId)!;
         for (const slot of cfg.slots) {
-          // Candidats: disponibles, no assignats avui, ordenats per score
-          const candidates = availableEmployees
-            .filter((e) => !assignedDates[e.id].has(dateStr))
+          const candidates = available
+            .filter((e) => !assignedDates[e.id].has(dateStr) && (daysThisWeek[e.id][weekKey] ?? 0) < maxDaysPerWeek)
             .map((e) => {
-              const prefs = preferences.filter(
-                (p) => p.employeeId === e.id && p.dayOfWeek === dayOfWeek
-              );
-              let score = 0;
-              if (prefs.length > 0) {
-                score += 10; // té preferència per aquest dia
-                if (prefs.some((p) => p.locationId === cfg.locationId)) score += 5; // local preferit
-                if (prefs.some((p) => p.startTime === slot.startTime)) score += 3; // hora coincideix
+              const ep = prefs.filter((p) => p.employeeId === e.id && p.dayOfWeek === dow);
+              const usual = e.locations?.some((l) => l.locationId === cfg.locationId) ?? false;
+              let score = usual ? 4 : 0;
+              if (ep.length) {
+                score += 10;
+                if (ep.some((p) => p.locationId === cfg.locationId)) score += 5;
+                if (ep.some((p) => p.startTime <= slot.startTime && p.endTime >= slot.endTime)) score += 3;
               }
-              return { employee: e, score };
+              // Fairness: fewer days assigned so far → slightly higher priority
+              score -= (daysThisWeek[e.id][weekKey] ?? 0) * 0.5;
+              return { e, score };
             })
             .sort((a, b) => b.score - a.score);
 
-          // Assigna el nombre de persones necessàries
           for (let n = 0; n < cfg.staffPerSlot; n++) {
-            const candidate = candidates[n];
-            if (!candidate) {
-              // No hi ha prou empleats disponibles
-              shifts.push({
-                employeeId: '__unassigned__',
-                employeeName: t('proposal.noCoverage'),
-                locationId: cfg.locationId,
-                locationName: loc.name,
-                date: dateStr,
-                startTime: slot.startTime,
-                endTime: slot.endTime,
-                warning: t('proposal.noShiftWarning'),
-              });
+            const c = candidates.shift();
+            if (!c) {
+              shifts.push({ employeeId: UNASSIGNED, employeeName: t('proposal.noCoverage'), locationId: cfg.locationId, locationName: loc.name, date: dateStr, startTime: slot.startTime, endTime: slot.endTime, warning: true });
             } else {
-              assignedDates[candidate.employee.id].add(dateStr);
-              // Elimina el candidat de la llista per a la propera iteració staffPerSlot
-              candidates.splice(n, 1);
-              shifts.push({
-                employeeId: candidate.employee.id,
-                employeeName: candidate.employee.name,
-                locationId: cfg.locationId,
-                locationName: loc.name,
-                date: dateStr,
-                startTime: slot.startTime,
-                endTime: slot.endTime,
-              });
+              assignedDates[c.e.id].add(dateStr);
+              daysThisWeek[c.e.id][weekKey] = (daysThisWeek[c.e.id][weekKey] ?? 0) + 1;
+              shifts.push({ employeeId: c.e.id, employeeName: c.e.name, locationId: cfg.locationId, locationName: loc.name, date: dateStr, startTime: slot.startTime, endTime: slot.endTime });
             }
           }
         }
       }
     }
-
     setProposal(shifts);
     setStep(4);
   };
 
-  // ── Aplicar proposta ───────────────────────────────────────────────────────
-
-  const applyProposal = async () => {
+  const apply = async () => {
     setApplying(true);
-    let ok = 0;
-    let errors = 0;
-
-    const validShifts = proposal.filter((s) => s.employeeId !== '__unassigned__');
-    for (const s of validShifts) {
-      try {
-        await createSchedule({
-          employeeId: s.employeeId,
-          locationId: s.locationId,
-          date: s.date,
-          startTime: s.startTime,
-          endTime: s.endTime,
-        });
-        ok++;
-      } catch {
-        errors++;
-      }
+    let ok = 0, errors = 0;
+    for (const s of proposal.filter((x) => x.employeeId !== UNASSIGNED)) {
+      try { await create.mutateAsync({ employeeId: s.employeeId, locationId: s.locationId, date: s.date, startTime: s.startTime, endTime: s.endTime }); ok++; }
+      catch { errors++; }
     }
-
-    setApplyResult({ ok, errors });
+    setResult({ ok, errors });
     setApplying(false);
-    if (errors === 0) {
-      setTimeout(() => { onApplied(); }, 1500);
-    }
+    toast[errors ? 'warning' : 'success'](errors ? t('proposal.resultErrors', { ok, errors }) : t('proposal.resultOk', { n: ok }));
+    if (!errors) setTimeout(onApplied, 900);
   };
 
-  // ─── Render ───────────────────────────────────────────────────────────────
+  const removeProposed = (idx: number) => setProposal(proposal.filter((_, i) => i !== idx));
 
-  if (loading) return (
-    <div style={styles.overlay}>
-      <div style={styles.modal}>
-        <p style={{ color: '#888', textAlign: 'center', padding: 40 }}>{t('common.loading')}</p>
-      </div>
-    </div>
-  );
+  const steps = t('proposal.steps', { returnObjects: true }) as string[];
+  const totalPerDay = locationConfigs.reduce((s, c) => s + c.slots.length * c.staffPerSlot, 0);
+  const validShifts = proposal.filter((s) => s.employeeId !== UNASSIGNED).length;
+  const warnings = proposal.length - validShifts;
+  const loading = employees.isLoading || locations.isLoading || vacations.isLoading || preferences.isLoading;
+
+  const shortcuts = [
+    { key: 'thisWeek', from: toISODate(startOfWeek(new Date(), { weekStartsOn: 1 })), to: toISODate(addDays(startOfWeek(new Date(), { weekStartsOn: 1 }), 6)) },
+    { key: 'nextWeek', from: toISODate(nextMonday), to: toISODate(addDays(nextMonday, 6)) },
+    { key: 'weekend', from: toISODate(addDays(startOfWeek(new Date(), { weekStartsOn: 1 }), 5)), to: toISODate(addDays(startOfWeek(new Date(), { weekStartsOn: 1 }), 6)) },
+  ];
 
   return (
-    <div style={styles.overlay} onClick={(e) => e.target === e.currentTarget && onClose()}>
-      <div style={styles.modal}>
-
-        {/* Header */}
-        <div style={styles.header}>
-          <div>
-            <h2 style={styles.title}>{t('proposal.title')}</h2>
-            <div style={styles.steps}>
-              {(t('proposal.steps', { returnObjects: true }) as string[]).map((s, i) => (
-                <span key={i} style={{ ...styles.stepDot, ...(step === i + 1 ? styles.stepDotActive : step > i + 1 ? styles.stepDotDone : {}) }}>
-                  {i + 1} {s}
-                </span>
-              ))}
-            </div>
-          </div>
-          <button style={styles.closeBtn} onClick={onClose}>{t('proposal.close')}</button>
-        </div>
-
-        <div style={styles.body}>
-
-          {/* ── STEP 1: Període ─────────────────────────────────────────── */}
+    <Modal open onClose={onClose} size="lg" title={<span className="row gap-2"><Icon name="wand" />{t('proposal.title')}</span>}
+      description={<div className="steps mt-2">{steps.map((s, i) => <span key={i} className={`step${step === i + 1 ? ' step-active' : step > i + 1 ? ' step-done' : ''}`}><span className="step-n">{step > i + 1 ? '✓' : i + 1}</span>{s}</span>)}</div>}
+      footer={
+        <>
+          {step > 1 && !result && <Button variant="ghost" icon="chevronLeft" onClick={() => setStep(step - 1)}>{t('proposal.back')}</Button>}
+          <div className="grow" />
+          {step === 1 && <Button variant="primary" iconRight="arrowRight" disabled={periodDays.length === 0} onClick={() => setStep(2)}>{t('proposal.continue')}</Button>}
+          {step === 2 && <Button variant="primary" iconRight="arrowRight" onClick={() => setStep(3)}>{t('proposal.configNeeds')}</Button>}
+          {step === 3 && <Button variant="primary" icon="sparkles" onClick={generate} disabled={available.length === 0}>{t('proposal.generate')}</Button>}
+          {step === 4 && !result && <Button variant="success" icon="check" loading={applying} onClick={apply} disabled={validShifts === 0}>{t('proposal.apply', { n: validShifts })}</Button>}
+          {result && <Button variant="primary" onClick={onApplied}>{t('common.close')}</Button>}
+        </>
+      }
+    >
+      {loading ? <div className="row gap-3 t-3" style={{ padding: 30, justifyContent: 'center' }}><span className="spinner" />{t('common.loading')}</div> : (
+        <div className="col gap-5">
           {step === 1 && (
-            <div>
-              <h3 style={styles.stepTitle}>{t('proposal.periodTitle')}</h3>
-              <p style={styles.stepDesc}>{t('proposal.periodDesc')}</p>
-
-              <div style={styles.periodRow}>
-                <div style={styles.field}>
-                  <label style={styles.label}>{t('proposal.from')}</label>
-                  <input type="date" style={styles.input} value={fromDate}
-                    onChange={(e) => setFromDate(e.target.value)} />
-                </div>
-                <div style={styles.fieldSep}>→</div>
-                <div style={styles.field}>
-                  <label style={styles.label}>{t('proposal.to')}</label>
-                  <input type="date" style={styles.input} value={toDate}
-                    onChange={(e) => setToDate(e.target.value)} min={fromDate} />
-                </div>
+            <>
+              <div><h3 style={{ fontSize: 16 }}>{t('proposal.periodTitle')}</h3><p className="t-sm t-3 mt-2">{t('proposal.periodDesc')}</p></div>
+              <div className="row-wrap">
+                {shortcuts.map((s) => <button key={s.key} className={`chip chip-btn${fromDate === s.from && toDate === s.to ? ' chip-active' : ''}`} onClick={() => { setFromDate(s.from); setToDate(s.to); }}>{t(`proposal.${s.key}`)}</button>)}
               </div>
-
+              <div className="form-grid">
+                <Field label={t('proposal.from')}><Input type="date" value={fromDate} onChange={(e) => setFromDate(e.target.value)} /></Field>
+                <Field label={t('proposal.to')}><Input type="date" value={toDate} min={fromDate} onChange={(e) => setToDate(e.target.value)} /></Field>
+                <Field label={t('proposal.maxDays')} hint={t('proposal.maxDaysHint')}><Input type="number" min={1} max={7} value={maxDaysPerWeek} onChange={(e) => setMaxDaysPerWeek(Math.min(7, Math.max(1, Number(e.target.value) || 1)))} /></Field>
+              </div>
               {periodDays.length > 0 && (
-                <div style={styles.periodPreview}>
-                  <span style={styles.periodBadge}>{periodDays.length} dies</span>
-                  {periodDays.map((d) => (
-                    <span key={d.toISOString()} style={styles.dayBadge}>
-                      {format(d, 'EEE d', { locale: ca })}
-                    </span>
-                  ))}
+                <div className="row-wrap">
+                  <Badge tone="brand">{t('proposal.days', { n: periodDays.length })}</Badge>
+                  {periodDays.slice(0, 14).map((d) => <span key={d.toISOString()} className="chip">{fmtDate(d, 'EEE d')}</span>)}
+                  {periodDays.length > 14 && <span className="chip">+{periodDays.length - 14}</span>}
                 </div>
               )}
-
-              {/* Dreceres */}
-              <div style={styles.shortcuts}>
-                {[
-                  { label: t('proposal.thisWeek'), from: format(new Date(), 'yyyy-MM-dd'), to: format(addDays(new Date(), 6), 'yyyy-MM-dd') },
-                  { label: t('proposal.nextWeek'), from: format(addDays(new Date(), 7), 'yyyy-MM-dd'), to: format(addDays(new Date(), 13), 'yyyy-MM-dd') },
-                  { label: t('proposal.weekend'), from: format(addDays(new Date(), (6 - new Date().getDay() + 6) % 7), 'yyyy-MM-dd'), to: format(addDays(new Date(), (6 - new Date().getDay() + 7) % 7), 'yyyy-MM-dd') },
-                ].map((s) => (
-                  <button key={s.label} style={styles.shortcutBtn}
-                    onClick={() => { setFromDate(s.from); setToDate(s.to); }}>
-                    {s.label}
-                  </button>
-                ))}
-              </div>
-            </div>
+            </>
           )}
 
-          {/* ── STEP 2: Resum automàtic ─────────────────────────────────── */}
           {step === 2 && (
-            <div>
-              <h3 style={styles.stepTitle}>{t('proposal.summaryTitle')}</h3>
-              <p style={styles.stepDesc}>
-                {format(parseISO(fromDate), 'd MMM', { locale: ca })} – {format(parseISO(toDate), 'd MMM yyyy', { locale: ca })} · {periodDays.length} dies
-              </p>
-
-              <div style={styles.summaryGrid}>
-                {/* Empleats de vacances */}
-                <div style={styles.summaryCard}>
-                  <div style={styles.summaryCardHeader}>
-                    <span style={styles.summaryIcon}>·</span>
-                    <span style={styles.summaryCardTitle}>{t('proposal.onVacation')}</span>
-                  </div>
-                  {vacationsDuringPeriod.length === 0 ? (
-                    <p style={styles.summaryEmpty}>{t('proposal.noVacations')}</p>
-                  ) : (
-                    vacationsDuringPeriod.map((v) => {
-                      const emp = employees.find((e) => e.id === v.employeeId);
-                      return (
-                        <div key={v.id} style={styles.summaryRow}>
-                          <span style={styles.summaryName}>{emp?.name ?? v.employeeId}</span>
-                          <span style={styles.summaryMeta}>
-                            {format(parseISO(v.fromDate), 'd MMM', { locale: ca })} → {format(parseISO(v.toDate), 'd MMM', { locale: ca })}
-                          </span>
-                        </div>
-                      );
-                    })
-                  )}
+            <>
+              <div><h3 style={{ fontSize: 16 }}>{t('proposal.summaryTitle')}</h3><p className="t-sm t-3 mt-2">{fmtDate(fromDate, 'd MMM')} – {fmtDate(toDate, 'd MMM yyyy')} · {t('proposal.days', { n: periodDays.length })}</p></div>
+              <div className="grid-auto">
+                <div className="card card-pad-sm">
+                  <div className="t-caps mb-3 row gap-2"><Icon name="palmtree" size={13} />{t('proposal.onVacation')}</div>
+                  {vacationsDuring.length === 0 ? <p className="t-sm t-4">{t('proposal.noVacations')}</p> : vacationsDuring.map((v) => (
+                    <div key={v.id} className="row between t-sm" style={{ padding: '4px 0' }}><span className="t-strong">{v.employee.name}</span><span className="t-3">{fmtDate(v.fromDate, 'd MMM')} → {fmtDate(v.toDate, 'd MMM')}</span></div>
+                  ))}
                 </div>
-
-                {/* Empleats disponibles */}
-                <div style={styles.summaryCard}>
-                  <div style={styles.summaryCardHeader}>
-                    <span style={styles.summaryIcon}>·</span>
-                    <span style={styles.summaryCardTitle}>{t('proposal.available')}</span>
-                  </div>
-                  {availableEmployees.map((e) => {
-                    const prefs = preferences.filter((p) => p.employeeId === e.id);
+                <div className="card card-pad-sm">
+                  <div className="t-caps mb-3 row gap-2"><Icon name="users" size={13} />{t('proposal.available')} · {available.length}</div>
+                  {available.length === 0 && <p className="t-sm t-danger">{t('proposal.noAvailable')}</p>}
+                  {available.map((e) => {
+                    const ep = prefs.filter((p) => p.employeeId === e.id);
                     return (
-                      <div key={e.id} style={styles.summaryRow}>
-                        <span style={styles.summaryName}>{e.name}</span>
-                        <span style={styles.summaryMeta}>
-                          {prefs.length > 0
-                            ? `Preferències: ${prefs.map((p) => ({ MON: 'dl', TUE: 'dt', WED: 'dc', THU: 'dj', FRI: 'dv', SAT: 'ds', SUN: 'dg' }[p.dayOfWeek])).join(', ')}`
-                            : 'Sense preferències definides'}
-                        </span>
+                      <div key={e.id} className="row between t-sm" style={{ padding: '4px 0' }}>
+                        <span className="row gap-2"><Avatar name={e.name} id={e.id} size={22} /><span className="t-strong">{e.name}</span></span>
+                        <span className="t-3 t-xs">{ep.length ? ep.map((p) => dayLabelFromCode(p.dayOfWeek)).join(' · ') : t('proposal.noPrefs')}</span>
                       </div>
                     );
                   })}
-                  {availableEmployees.length === 0 && (
-                    <p style={{ ...styles.summaryEmpty, color: '#ef4444' }}>
-                      {t('proposal.noAvailable')}
-                    </p>
-                  )}
                 </div>
-
-                {/* Locals */}
-                <div style={styles.summaryCard}>
-                  <div style={styles.summaryCardHeader}>
-                    <span style={styles.summaryIcon}>·</span>
-                    <span style={styles.summaryCardTitle}>{t('proposal.locationsToCover')}</span>
-                  </div>
-                  {locations.map((l) => (
-                    <div key={l.id} style={styles.summaryRow}>
-                      <span style={styles.summaryName}>{l.name}</span>
-                    </div>
-                  ))}
+                <div className="card card-pad-sm">
+                  <div className="t-caps mb-3 row gap-2"><Icon name="mapPin" size={13} />{t('proposal.locationsToCover')}</div>
+                  {locations.data?.map((l) => <div key={l.id} className="t-sm t-strong" style={{ padding: '4px 0' }}>{l.name}</div>)}
                 </div>
               </div>
-            </div>
+            </>
           )}
 
-          {/* ── STEP 3: Qüestionari ─────────────────────────────────────── */}
           {step === 3 && (
-            <div>
-              <h3 style={styles.stepTitle}>{t('proposal.configTitle')}</h3>
-              <p style={styles.stepDesc}>
-                {t('proposal.configDesc')}
-              </p>
-
-              <div style={styles.configList}>
-                {locationConfigs.map((cfg) => {
-                  const loc = locations.find((l) => l.id === cfg.locationId)!;
-                  return (
-                    <div key={cfg.locationId} style={styles.configCard}>
-                      <div style={styles.configCardHeader}>
-                        <span style={styles.configLocName}>{loc.name}</span>
-                        <div style={styles.staffRow}>
-                          <label style={styles.label}>{t('proposal.personsPerShift')}</label>
-                          <div style={styles.counter}>
-                            <button style={styles.counterBtn}
-                              onClick={() => updateConfig(cfg.locationId, { staffPerSlot: Math.max(1, cfg.staffPerSlot - 1) })}>−</button>
-                            <span style={styles.counterVal}>{cfg.staffPerSlot}</span>
-                            <button style={styles.counterBtn}
-                              onClick={() => updateConfig(cfg.locationId, { staffPerSlot: Math.min(availableEmployees.length, cfg.staffPerSlot + 1) })}>+</button>
-                          </div>
-                        </div>
-                      </div>
-
-                      <div style={styles.slotsSection}>
-                        <span style={styles.label}>{t('proposal.dailyShifts')}</span>
-                        {cfg.slots.map((slot, idx) => (
-                          <div key={idx} style={styles.slotRow}>
-                            <input
-                              style={{ ...styles.input, width: 110 }}
-                              value={slot.label}
-                              onChange={(e) => updateSlot(cfg.locationId, idx, { label: e.target.value })}
-                              placeholder="Nom torn"
-                            />
-                            <input type="time" style={{ ...styles.input, width: 90 }}
-                              value={slot.startTime}
-                              onChange={(e) => updateSlot(cfg.locationId, idx, { startTime: e.target.value })} />
-                            <span style={{ color: '#aaa', fontSize: 13 }}>→</span>
-                            <input type="time" style={{ ...styles.input, width: 90 }}
-                              value={slot.endTime}
-                              onChange={(e) => updateSlot(cfg.locationId, idx, { endTime: e.target.value })} />
-                            {cfg.slots.length > 1 && (
-                              <button style={styles.removeSlotBtn} onClick={() => removeSlot(cfg.locationId, idx)}>×</button>
-                            )}
-                            {/* Dreceres */}
-                            {PRESET_SLOTS.map((p) => (
-                              <button key={p.label} style={styles.presetBtn}
-                                onClick={() => updateSlot(cfg.locationId, idx, p)}>
-                                {p.label}
-                              </button>
-                            ))}
-                          </div>
-                        ))}
-                        <button style={styles.addSlotBtn} onClick={() => addSlot(cfg.locationId)}>
-                          {t('proposal.addShift')}
-                        </button>
-                      </div>
+            <>
+              <div><h3 style={{ fontSize: 16 }}>{t('proposal.configTitle')}</h3><p className="t-sm t-3 mt-2">{t('proposal.configDesc')}</p></div>
+              {locationConfigs.map((cfg) => {
+                const loc = locations.data!.find((l) => l.id === cfg.locationId)!;
+                return (
+                  <div key={cfg.locationId} className="card card-pad-sm col gap-3">
+                    <div className="row between">
+                      <span className="t-strong row gap-2"><Icon name="mapPin" size={14} />{loc.name}</span>
+                      <span className="row gap-2 t-sm">
+                        <span className="t-3">{t('proposal.personsPerShift')}</span>
+                        <Button size="sm" icon="minus" onClick={() => updateConfig(cfg.locationId, { staffPerSlot: Math.max(1, cfg.staffPerSlot - 1) })} />
+                        <b style={{ minWidth: 16, textAlign: 'center' }}>{cfg.staffPerSlot}</b>
+                        <Button size="sm" icon="plus" onClick={() => updateConfig(cfg.locationId, { staffPerSlot: Math.min(Math.max(1, available.length), cfg.staffPerSlot + 1) })} />
+                      </span>
                     </div>
-                  );
-                })}
-              </div>
-
-              <div style={styles.summaryBox}>
-                {t('proposal.summaryBox', {
-                  days: periodDays.length,
-                  assignments: locationConfigs.reduce((s, c) => s + c.slots.length * c.staffPerSlot, 0),
-                  total: periodDays.length * locationConfigs.reduce((s, c) => s + c.slots.length * c.staffPerSlot, 0),
-                  employees: availableEmployees.length,
-                })}
-              </div>
-            </div>
+                    {cfg.slots.map((slot, idx) => (
+                      <div key={idx} className="row-wrap">
+                        <Input small value={slot.label} style={{ width: 120 }} onChange={(e) => updateSlot(cfg.locationId, idx, { label: e.target.value })} placeholder={t('proposal.slotName')} />
+                        <Input small type="time" value={slot.startTime} style={{ width: 100 }} onChange={(e) => updateSlot(cfg.locationId, idx, { startTime: e.target.value })} />
+                        <span className="t-4">→</span>
+                        <Input small type="time" value={slot.endTime} style={{ width: 100 }} onChange={(e) => updateSlot(cfg.locationId, idx, { endTime: e.target.value })} />
+                        {PRESETS.map((p) => <button key={p.key} className="chip chip-btn" style={{ height: 24, fontSize: 11 }} onClick={() => updateSlot(cfg.locationId, idx, { label: t(`schedules.preset.${p.key}`), startTime: p.startTime, endTime: p.endTime })}>{t(`schedules.preset.${p.key}`)}</button>)}
+                        {cfg.slots.length > 1 && <Button size="sm" variant="ghost" icon="x" onClick={() => updateConfig(cfg.locationId, { slots: cfg.slots.filter((_, i) => i !== idx) })} />}
+                      </div>
+                    ))}
+                    <Button size="sm" variant="ghost" icon="plus" style={{ alignSelf: 'flex-start' }} onClick={() => updateConfig(cfg.locationId, { slots: [...cfg.slots, { label: t('schedules.preset.midday'), ...PRESETS[1] }] })}>{t('proposal.addShift')}</Button>
+                  </div>
+                );
+              })}
+              <div className="notice notice-info"><Icon name="info" /><span>{t('proposal.summaryBox', { days: periodDays.length, assignments: totalPerDay, total: periodDays.length * totalPerDay, employees: available.length })}</span></div>
+            </>
           )}
 
-          {/* ── STEP 4: Proposta ────────────────────────────────────────── */}
           {step === 4 && (
-            <div>
-              <h3 style={styles.stepTitle}>{t('proposal.proposalTitle')}</h3>
-              <p style={styles.stepDesc}>
-                {t('proposal.warningNote')}
-              </p>
-
-              {applyResult && (
-                <div style={{ ...styles.summaryBox, backgroundColor: applyResult.errors === 0 ? '#f0fdf4' : '#fff7ed', borderColor: applyResult.errors === 0 ? '#86efac' : '#fdba74', marginBottom: 16 }}>
-                  {applyResult.errors === 0
-                    ? t('proposal.resultOk', { n: applyResult.ok })
-                    : t('proposal.resultErrors', { ok: applyResult.ok, errors: applyResult.errors })}
-                </div>
-              )}
-
-              {/* Vista per dia */}
+            <>
+              <div className="row between">
+                <div><h3 style={{ fontSize: 16 }}>{t('proposal.proposalTitle')}</h3><p className="t-sm t-3 mt-2">{t('proposal.reviewHint')}</p></div>
+                <div className="row gap-2"><Badge tone="success">{validShifts} {t('schedules.shiftsShort')}</Badge>{warnings > 0 && <Badge tone="warning">{t('proposal.uncovered', { n: warnings })}</Badge>}</div>
+              </div>
+              {result && <div className={`notice notice-${result.errors ? 'warning' : 'success'}`}><Icon name={result.errors ? 'alert' : 'checkCircle'} /><span>{result.errors ? t('proposal.resultErrors', { ok: result.ok, errors: result.errors }) : t('proposal.resultOk', { n: result.ok })}</span></div>}
               {periodDays.map((day) => {
-                const dateStr = format(day, 'yyyy-MM-dd');
-                const dayShifts = proposal.filter((s) => s.date === dateStr);
-                if (dayShifts.length === 0) return null;
+                const dateStr = toISODate(day);
+                const rows = proposal.map((s, i) => ({ s, i })).filter(({ s }) => s.date === dateStr);
+                if (!rows.length) return null;
                 return (
-                  <div key={dateStr} style={styles.daySection}>
-                    <div style={styles.daySectionHeader}>
-                      {format(day, 'EEEE, d MMMM', { locale: ca })}
-                    </div>
-                    <div style={styles.shiftList}>
-                      {dayShifts.map((s, i) => (
-                        <div key={i} style={{ ...styles.shiftRow, ...(s.warning ? styles.shiftRowWarning : {}) }}>
-                          <span style={styles.shiftTime}>{s.startTime}–{s.endTime}</span>
-                          <span style={styles.shiftLoc}>{s.locationName}</span>
-                          <span style={s.warning ? styles.shiftEmpWarning : styles.shiftEmp}>{s.employeeName}</span>
-                          {s.warning && <span style={styles.warningNote}>{s.warning}</span>}
+                  <div key={dateStr}>
+                    <div className="t-caps mb-2" style={{ paddingBottom: 6, borderBottom: '1px solid var(--border)' }}>{fmtDate(day, 'EEEE, d MMMM')}</div>
+                    <div className="col gap-2">
+                      {rows.map(({ s, i }) => (
+                        <div key={i} className="row gap-3" style={{ padding: '7px 10px', borderRadius: 8, background: s.warning ? 'var(--warning-bg)' : 'var(--surface-2)' }}>
+                          <span className="t-sm t-strong t-num" style={{ width: 92 }}>{s.startTime}–{s.endTime}</span>
+                          <span className="t-sm t-3 grow t-truncate">{s.locationName}</span>
+                          {s.warning ? <span className="t-sm t-warning row gap-2"><Icon name="alert" size={14} />{s.employeeName}</span> : (
+                            <span className="row gap-2 t-sm t-strong"><span className="dot" style={{ background: colorFor(s.employeeId) }} />{s.employeeName}</span>
+                          )}
+                          {!result && <Button size="sm" variant="ghost" icon="x" onClick={() => removeProposed(i)} aria-label={t('common.delete')} />}
                         </div>
                       ))}
                     </div>
                   </div>
                 );
               })}
-            </div>
+              <p className="t-xs t-4">{t('proposal.totalNote', { n: fmtNum(validShifts) })}</p>
+            </>
           )}
         </div>
-
-        {/* Footer navigation */}
-        <div style={styles.footer}>
-          {step > 1 && !applyResult && (
-            <button style={styles.backBtn} onClick={() => setStep(step - 1)}>{t('proposal.back')}</button>
-          )}
-          <div style={{ flex: 1 }} />
-
-          {step === 1 && (
-            <button style={styles.nextBtn}
-              disabled={!fromDate || !toDate || fromDate > toDate}
-              onClick={() => setStep(2)}>
-              {t('proposal.continue')}
-            </button>
-          )}
-          {step === 2 && (
-            <button style={styles.nextBtn} onClick={() => setStep(3)}>
-              {t('proposal.configNeeds')}
-            </button>
-          )}
-          {step === 3 && (
-            <button style={styles.nextBtn} onClick={generateProposal}
-              disabled={availableEmployees.length === 0}>
-              {t('proposal.generate')}
-            </button>
-          )}
-          {step === 4 && !applyResult && (
-            <button style={{ ...styles.nextBtn, backgroundColor: '#059669' }}
-              onClick={applyProposal} disabled={applying}>
-              {applying ? t('proposal.applying') : t('proposal.apply', { n: proposal.filter((s) => s.employeeId !== '__unassigned__').length })}
-            </button>
-          )}
-        </div>
-      </div>
-    </div>
+      )}
+    </Modal>
   );
 }
-
-// ─── Styles ───────────────────────────────────────────────────────────────────
-
-const styles: Record<string, React.CSSProperties> = {
-  overlay: {
-    position: 'fixed', inset: 0, backgroundColor: 'rgba(0,0,0,0.45)',
-    display: 'flex', alignItems: 'center', justifyContent: 'center',
-    zIndex: 1000, padding: 20,
-  },
-  modal: {
-    backgroundColor: '#fff', borderRadius: 16, width: '100%', maxWidth: 780,
-    maxHeight: '90vh', display: 'flex', flexDirection: 'column',
-    boxShadow: '0 20px 60px rgba(0,0,0,0.2)',
-  },
-  header: {
-    padding: '20px 24px 16px', borderBottom: '1px solid #eee',
-    display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', flexShrink: 0,
-  },
-  title: { fontSize: 18, fontWeight: 800, color: '#1a1a2e', margin: '0 0 10px' },
-  steps: { display: 'flex', gap: 8, flexWrap: 'wrap' },
-  stepDot: {
-    fontSize: 11, padding: '3px 10px', borderRadius: 20,
-    backgroundColor: '#f0f0f0', color: '#999', fontWeight: 600,
-  },
-  stepDotActive: { backgroundColor: '#1a1a2e', color: '#fff' },
-  stepDotDone: { backgroundColor: '#d1fae5', color: '#065f46' },
-  closeBtn: {
-    background: 'transparent', border: 'none', fontSize: 22, color: '#aaa',
-    cursor: 'pointer', lineHeight: 1, marginTop: -4,
-  },
-  body: { flex: 1, overflowY: 'auto', padding: '20px 24px' },
-  footer: {
-    padding: '14px 24px', borderTop: '1px solid #eee',
-    display: 'flex', alignItems: 'center', gap: 10, flexShrink: 0,
-  },
-
-  stepTitle: { fontSize: 16, fontWeight: 700, color: '#1a1a2e', margin: '0 0 6px' },
-  stepDesc: { fontSize: 13, color: '#888', margin: '0 0 20px' },
-
-  // Step 1
-  periodRow: { display: 'flex', alignItems: 'flex-end', gap: 12, marginBottom: 16 },
-  fieldSep: { fontSize: 20, color: '#aaa', marginBottom: 8 },
-  field: { display: 'flex', flexDirection: 'column', gap: 4, flex: 1 },
-  label: { fontSize: 12, fontWeight: 600, color: '#555' },
-  input: { padding: '9px 12px', border: '1.5px solid #ddd', borderRadius: 8, fontSize: 13, outline: 'none' },
-  periodPreview: { display: 'flex', flexWrap: 'wrap', gap: 6, marginBottom: 16 },
-  periodBadge: {
-    fontSize: 11, fontWeight: 700, padding: '4px 10px', borderRadius: 20,
-    backgroundColor: '#1a1a2e', color: '#fff',
-  },
-  dayBadge: {
-    fontSize: 11, padding: '4px 10px', borderRadius: 20,
-    backgroundColor: '#f0f0f8', color: '#555',
-  },
-  shortcuts: { display: 'flex', gap: 8, flexWrap: 'wrap' },
-  shortcutBtn: {
-    padding: '6px 14px', border: '1.5px solid #ddd', borderRadius: 8,
-    background: '#fff', fontSize: 12, cursor: 'pointer', color: '#555',
-  },
-
-  // Step 2
-  summaryGrid: { display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(220px, 1fr))', gap: 14 },
-  summaryCard: {
-    backgroundColor: '#f8f8fc', borderRadius: 10, padding: '14px 16px',
-    border: '1px solid #e8e8f0',
-  },
-  summaryCardHeader: { display: 'flex', alignItems: 'center', gap: 8, marginBottom: 12 },
-  summaryIcon: { fontSize: 18 },
-  summaryCardTitle: { fontSize: 12, fontWeight: 700, color: '#444', textTransform: 'uppercase', letterSpacing: '0.3px' },
-  summaryRow: { display: 'flex', justifyContent: 'space-between', alignItems: 'baseline', marginBottom: 8, gap: 8 },
-  summaryName: { fontSize: 13, fontWeight: 600, color: '#1a1a2e' },
-  summaryMeta: { fontSize: 11, color: '#888', textAlign: 'right' },
-  summaryEmpty: { fontSize: 12, color: '#aaa', fontStyle: 'italic', margin: 0 },
-
-  // Step 3
-  configList: { display: 'flex', flexDirection: 'column', gap: 16, marginBottom: 16 },
-  configCard: {
-    border: '1.5px solid #e0e0ee', borderRadius: 10, padding: '16px 18px',
-  },
-  configCardHeader: { display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 14, flexWrap: 'wrap', gap: 10 },
-  configLocName: { fontSize: 14, fontWeight: 700, color: '#1a1a2e' },
-  staffRow: { display: 'flex', alignItems: 'center', gap: 10 },
-  counter: { display: 'flex', alignItems: 'center', gap: 8 },
-  counterBtn: {
-    width: 28, height: 28, border: '1.5px solid #ddd', borderRadius: 6,
-    background: '#fff', fontSize: 16, cursor: 'pointer', display: 'flex',
-    alignItems: 'center', justifyContent: 'center', color: '#555',
-  },
-  counterVal: { fontSize: 16, fontWeight: 700, color: '#1a1a2e', minWidth: 20, textAlign: 'center' },
-  slotsSection: { display: 'flex', flexDirection: 'column', gap: 8 },
-  slotRow: { display: 'flex', alignItems: 'center', gap: 8, flexWrap: 'wrap' },
-  removeSlotBtn: {
-    background: 'transparent', border: 'none', color: '#e53e3e',
-    fontSize: 18, cursor: 'pointer', lineHeight: 1,
-  },
-  presetBtn: {
-    padding: '4px 8px', border: '1px solid #ddd', borderRadius: 6,
-    background: '#f8f8fc', fontSize: 11, cursor: 'pointer', color: '#666',
-  },
-  addSlotBtn: {
-    alignSelf: 'flex-start', padding: '5px 12px', border: '1.5px dashed #aaa',
-    borderRadius: 6, background: 'transparent', fontSize: 12, cursor: 'pointer', color: '#777', marginTop: 4,
-  },
-  summaryBox: {
-    backgroundColor: '#f0f0f8', borderRadius: 8, padding: '12px 16px',
-    fontSize: 13, color: '#444', border: '1px solid #dde',
-  },
-
-  // Step 4
-  daySection: { marginBottom: 16 },
-  daySectionHeader: {
-    fontSize: 12, fontWeight: 700, color: '#888', textTransform: 'uppercase',
-    letterSpacing: '0.5px', marginBottom: 8, paddingBottom: 6,
-    borderBottom: '1px solid #eee',
-  },
-  shiftList: { display: 'flex', flexDirection: 'column', gap: 6 },
-  shiftRow: {
-    display: 'flex', alignItems: 'center', gap: 12, padding: '8px 12px',
-    backgroundColor: '#f8f8fc', borderRadius: 8, flexWrap: 'wrap',
-  },
-  shiftRowWarning: { backgroundColor: '#fffbeb', border: '1px solid #fde68a' },
-  shiftTime: { fontSize: 12, fontWeight: 700, color: '#4f46e5', minWidth: 100 },
-  shiftLoc: { fontSize: 12, color: '#888', flex: 1 },
-  shiftEmp: { fontSize: 13, fontWeight: 600, color: '#1a1a2e' },
-  shiftEmpWarning: { fontSize: 13, fontWeight: 600, color: '#f59e0b' },
-  warningNote: { fontSize: 11, color: '#92400e', fontStyle: 'italic', width: '100%' },
-
-  // Buttons
-  backBtn: {
-    padding: '9px 18px', border: '1.5px solid #ddd', borderRadius: 8,
-    background: '#fff', fontSize: 13, cursor: 'pointer', color: '#555',
-  },
-  nextBtn: {
-    padding: '10px 22px', backgroundColor: '#1a1a2e', color: '#fff',
-    border: 'none', borderRadius: 8, fontSize: 13, fontWeight: 700, cursor: 'pointer',
-  },
-};

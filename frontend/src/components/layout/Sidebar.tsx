@@ -1,171 +1,70 @@
 import { NavLink, useNavigate } from 'react-router-dom';
-import { useAuthStore } from '../../store/authStore';
 import { useTranslation } from 'react-i18next';
-import { LANGUAGES, type LangCode } from '../../i18n';
+import { useState } from 'react';
+import { useAuthStore } from '../../store/authStore';
+import { useVacations } from '../../hooks/queries';
+import { NAV_ITEMS } from './nav';
+import Logo from './Logo';
+import Icon from '../ui/Icon';
+import Avatar from '../ui/Avatar';
+import LangSwitcher from './LangSwitcher';
+import ThemeToggle from './ThemeToggle';
 
 export default function Sidebar() {
+  const { t } = useTranslation();
   const { user, logout } = useAuthStore();
   const navigate = useNavigate();
-  const { t, i18n } = useTranslation();
+  const [collapsed, setCollapsed] = useState(() => localStorage.getItem('cafgic-sidebar') === 'collapsed');
+  const { data: vacations } = useVacations({ status: 'PENDING' });
+  const pending = vacations?.length ?? 0;
 
-  const navItems = [
-    { to: '/', label: t('nav.home') },
-    { to: '/horaris', label: t('nav.schedules') },
-    { to: '/empleats', label: t('nav.employees') },
-    { to: '/comandes', label: t('nav.orders') },
-    { to: '/caixa', label: t('nav.cash') },
-    { to: '/planificacio', label: t('nav.planning') },
-  ];
-
-  const handleLang = (code: LangCode) => {
-    i18n.changeLanguage(code);
+  const toggle = () => {
+    const next = !collapsed;
+    setCollapsed(next);
+    localStorage.setItem('cafgic-sidebar', next ? 'collapsed' : 'open');
   };
 
+  const name = user?.email?.split('@')[0] ?? '';
+
   return (
-    <aside style={styles.sidebar}>
-      <div style={styles.logo}>
-        <span style={styles.logoMark}>C</span>
-        <div>
-          <span style={styles.logoText}>Cafgic</span>
-          <span style={styles.logoSub}>Massiu Soft</span>
+    <aside className="sidebar" data-collapsed={collapsed}>
+      <button className="side-collapse" onClick={toggle} aria-label={collapsed ? t('nav.expand') : t('nav.collapse')}>
+        <Icon name={collapsed ? 'chevronsRight' : 'chevronsLeft'} />
+      </button>
+      <div className="side-logo">
+        <Logo />
+        <div className="side-logo-text">
+          <span className="side-logo-name">Cafgic</span>
+          <span className="side-logo-sub">{user?.group?.name ?? 'Massiu Soft'}</span>
         </div>
       </div>
 
-      <nav style={styles.nav}>
-        {navItems.map((item) => (
-          <NavLink
-            key={item.to}
-            to={item.to}
-            end={item.to === '/'}
-            style={({ isActive }) => ({ ...styles.navLink, ...(isActive ? styles.navLinkActive : {}) })}
-          >
-            {item.label}
+      <nav className="side-nav">
+        {NAV_ITEMS.map((item) => (
+          <NavLink key={item.to} to={item.to} end={item.end} className="side-link" title={collapsed ? t(item.key) : undefined}>
+            <Icon name={item.icon} />
+            <span>{t(item.key)}</span>
+            {item.to === '/empleats' && pending > 0 && <span className="count-pill">{pending}</span>}
           </NavLink>
         ))}
       </nav>
 
-      {/* Selector d'idioma */}
-      <div style={styles.langSection}>
-        <span style={styles.langLabel}>Idioma / Sprache</span>
-        <div style={styles.langGrid}>
-          {LANGUAGES.map((lang) => (
-            <button
-              key={lang.code}
-              style={{
-                ...styles.langBtn,
-                ...(i18n.language === lang.code ? styles.langBtnActive : {}),
-              }}
-              onClick={() => handleLang(lang.code)}
-              title={lang.label}
-            >
-              {lang.code.toUpperCase()}
-            </button>
-          ))}
+      <div className="side-foot">
+        <div className="side-user">
+          <Avatar name={name || 'U'} id={user?.id} size={30} />
+          <div className="side-user-info">
+            <span className="side-user-name">{name}</span>
+            <span className="side-user-role">{t(`roles.${user?.role ?? 'EMPLOYEE'}`)}</span>
+          </div>
         </div>
-      </div>
-
-      <div style={styles.footer}>
-        <div style={styles.userInfo}>
-          <span style={styles.userRole}>{user?.role}</span>
-          <span style={styles.userEmail}>{user?.email}</span>
+        <div className="side-tools">
+          <LangSwitcher className="side-tool" up />
+          <ThemeToggle className="side-tool" />
+          <button className="side-tool" onClick={() => { logout(); navigate('/login'); }} title={t('common.logout')} aria-label={t('common.logout')}>
+            <Icon name="logout" />
+          </button>
         </div>
-        <button onClick={() => { logout(); navigate('/login'); }} style={styles.logoutBtn}>
-          {t('common.logout')}
-        </button>
       </div>
     </aside>
   );
 }
-
-const styles: Record<string, React.CSSProperties> = {
-  sidebar: {
-    width: 200,
-    minHeight: '100vh',
-    backgroundColor: '#2D3250',
-    display: 'flex',
-    flexDirection: 'column',
-    flexShrink: 0,
-  },
-  logo: {
-    padding: '22px 18px 18px',
-    borderBottom: '1px solid rgba(255,255,255,0.06)',
-    display: 'flex',
-    alignItems: 'center',
-    gap: 10,
-  },
-  logoMark: {
-    width: 32, height: 32, borderRadius: 8,
-    backgroundColor: '#F4E285', color: '#2D3250',
-    fontSize: 16, fontWeight: 900,
-    display: 'flex', alignItems: 'center', justifyContent: 'center',
-    flexShrink: 0,
-  },
-  logoText: { fontSize: 16, fontWeight: 800, color: '#fff', display: 'block', letterSpacing: '-0.3px' },
-  logoSub: { fontSize: 10, color: '#6B7A9F', display: 'block', marginTop: 1, textTransform: 'uppercase', letterSpacing: '0.5px' },
-  nav: { flex: 1, padding: '12px 10px', display: 'flex', flexDirection: 'column', gap: 1 },
-  navLink: {
-    display: 'block',
-    padding: '9px 12px',
-    borderRadius: 7,
-    textDecoration: 'none',
-    color: '#7A84A8',
-    fontSize: 13.5,
-    fontWeight: 500,
-    transition: 'all 0.12s',
-  },
-  navLinkActive: {
-    backgroundColor: 'rgba(255,255,255,0.07)',
-    color: '#fff',
-    fontWeight: 600,
-  },
-  langSection: {
-    padding: '12px 14px',
-    borderTop: '1px solid rgba(255,255,255,0.06)',
-  },
-  langLabel: {
-    fontSize: 9,
-    color: '#4A5470',
-    textTransform: 'uppercase',
-    letterSpacing: '0.6px',
-    display: 'block',
-    marginBottom: 8,
-    fontWeight: 700,
-  },
-  langGrid: {
-    display: 'grid',
-    gridTemplateColumns: 'repeat(3, 1fr)',
-    gap: 4,
-  },
-  langBtn: {
-    padding: '5px 2px',
-    background: 'transparent',
-    border: '1px solid rgba(255,255,255,0.08)',
-    borderRadius: 5,
-    color: '#5A6480',
-    fontSize: 10,
-    fontWeight: 700,
-    cursor: 'pointer',
-    letterSpacing: '0.3px',
-    transition: 'all 0.12s',
-  },
-  langBtnActive: {
-    backgroundColor: '#F4E285',
-    color: '#2D3250',
-    borderColor: '#F4E285',
-  },
-  footer: {
-    padding: '14px 18px',
-    borderTop: '1px solid rgba(255,255,255,0.06)',
-    display: 'flex',
-    flexDirection: 'column',
-    gap: 8,
-  },
-  userInfo: { display: 'flex', flexDirection: 'column', gap: 2 },
-  userRole: { fontSize: 10, color: '#6B7A9F', textTransform: 'uppercase', letterSpacing: '0.5px' },
-  userEmail: { fontSize: 11, color: '#7A84A8', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' },
-  logoutBtn: {
-    background: 'transparent', border: '1px solid rgba(255,255,255,0.1)',
-    color: '#7A84A8', borderRadius: 6, padding: '6px 10px',
-    fontSize: 12, cursor: 'pointer', textAlign: 'left',
-  },
-};

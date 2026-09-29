@@ -15,9 +15,19 @@ import cashClosingsRouter from './routes/cashClosings';
 import vacationsRouter from './routes/vacations';
 import preferencesRouter from './routes/preferences';
 import analyticsRouter from './routes/analytics';
+import suppliersRouter from './routes/suppliers';
 
 const app = express();
 const PORT = process.env.PORT ?? 4000;
+
+// Fail fast: a production deployment must never run with the fallback secret.
+if (process.env.NODE_ENV === 'production' && !process.env.JWT_SECRET) {
+  console.error('[coffe_logic] JWT_SECRET no definit. Aturant el servidor.');
+  process.exit(1);
+}
+
+// Render / proxies: trust the first hop so req.ip is the real client address.
+app.set('trust proxy', 1);
 
 // ─── Global Middleware ────────────────────────────────────────────────────────
 
@@ -34,7 +44,7 @@ app.use(cors({
   credentials: true,
 }));
 app.use(morgan(process.env.NODE_ENV === 'production' ? 'combined' : 'dev'));
-app.use(express.json());
+app.use(express.json({ limit: '1mb' }));
 app.use(express.urlencoded({ extended: true }));
 
 // ─── Routes ───────────────────────────────────────────────────────────────────
@@ -48,6 +58,7 @@ app.use('/api/groups', groupsRouter);
 app.use('/api/locations', locationsRouter);
 app.use('/api/employees', employeesRouter);
 app.use('/api/schedules', schedulesRouter);
+app.use('/api/suppliers', suppliersRouter);
 app.use('/api/orders', ordersRouter);
 app.use('/api/cash-closings', cashClosingsRouter);
 app.use('/api/vacations', vacationsRouter);

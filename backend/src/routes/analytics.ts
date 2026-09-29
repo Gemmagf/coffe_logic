@@ -26,13 +26,14 @@ router.get('/cash', async (req: AuthRequest, res: Response, next: NextFunction) 
       return res.json({ success: true, data: { byDayOfWeek: [], trend: [], forecast: [], summary: null } });
     }
 
-    // Mitjana de vendes per dia de la setmana (0=Dg, 1=Dl...6=Ds)
-    const dayNames = ['Diumenge', 'Dilluns', 'Dimarts', 'Dimecres', 'Dijous', 'Divendres', 'Dissabte'];
+    // Mitjana de vendes per dia de la setmana (0=Dg, 1=Dl...6=Ds).
+    // Les etiquetes són codis ISO curts; el frontend els tradueix.
+    const dayNames = DAY_CODES;
     const byDay: Record<number, { total: number; count: number }> = {};
     for (let i = 0; i < 7; i++) byDay[i] = { total: 0, count: 0 };
 
     closings.forEach((c) => {
-      const d = new Date(c.date);
+      const d = parseLocalDate(c.date);
       const dow = d.getDay();
       byDay[dow].total += Number(c.sales);
       byDay[dow].count += 1;
@@ -49,16 +50,16 @@ router.get('/cash', async (req: AuthRequest, res: Response, next: NextFunction) 
       .sort((a, b) => a.day - b.day);
 
     // Tendència setmanal (últimes 8 setmanes)
-    const weeklyMap: Record<string, { sales: number; count: number; expenses: number }> = {};
+    const weeklyMap: Record<string, { sales: number; dates: Set<string>; expenses: number }> = {};
     closings.forEach((c) => {
-      const d = new Date(c.date);
+      const d = parseLocalDate(c.date);
       // Setmana ISO: any-setmana
       const weekNum = getISOWeek(d);
       const key = `${d.getFullYear()}-W${String(weekNum).padStart(2, '0')}`;
-      if (!weeklyMap[key]) weeklyMap[key] = { sales: 0, count: 0, expenses: 0 };
+      if (!weeklyMap[key]) weeklyMap[key] = { sales: 0, dates: new Set(), expenses: 0 };
       weeklyMap[key].sales += Number(c.sales);
       weeklyMap[key].expenses += Number(c.expenses);
-      weeklyMap[key].count += 1;
+      weeklyMap[key].dates.add(c.date);
     });
 
     const trend = Object.entries(weeklyMap)
@@ -69,7 +70,7 @@ router.get('/cash', async (req: AuthRequest, res: Response, next: NextFunction) 
         sales: Math.round(v.sales),
         expenses: Math.round(v.expenses),
         net: Math.round(v.sales - v.expenses),
-        days: v.count,
+        days: v.dates.size,
       }));
 
     // Previsió propera setmana (basada en mitjana per dia de la setmana)
@@ -81,7 +82,7 @@ router.get('/cash', async (req: AuthRequest, res: Response, next: NextFunction) 
       const dow = d.getDay();
       const avg = byDay[dow].count > 0 ? Math.round(byDay[dow].total / byDay[dow].count) : 0;
       forecast.push({
-        date: d.toISOString().slice(0, 10),
+        date: toLocalISO(d),
         label: dayNames[dow],
         predicted: avg,
       });
@@ -205,7 +206,7 @@ router.get('/orders', async (req: AuthRequest, res: Response, next: NextFunction
         unit: p.lastUnit,
         supplierId: p.supplierId,
         supplierName: p.supplierName,
-        reason: `Comandes habitualment ${p.avgQty} ${p.lastUnit}`,
+        reason: 'usual',
       }));
 
     res.json({ success: true, data: { topProducts, supplierFrequency, suggestions } });
@@ -217,8 +218,8 @@ router.get('/orders', async (req: AuthRequest, res: Response, next: NextFunction
 
 router.get('/staffing', async (req: AuthRequest, res: Response, next: NextFunction) => {
   try {
-    const today = new Date().toISOString().slice(0, 10);
-    const twoWeeks = new Date(Date.now() + 14 * 86400000).toISOString().slice(0, 10);
+    const today = toLocalISO(new Date());
+    const twoWeeks = toLocalISO(new Date(Date.now() + 14 * 86400000));
 
     const [schedules, locations, employees] = await Promise.all([
       prisma.schedule.findMany({
@@ -247,11 +248,11 @@ router.get('/staffing', async (req: AuthRequest, res: Response, next: NextFuncti
 
     const coverage = Array.from({ length: 14 }, (_, i) => {
       const d = new Date(Date.now() + i * 86400000);
-      const date = d.toISOString().slice(0, 10);
+      const date = toLocalISO(d);
       const data = byDate[date];
       return {
         date,
-        dayLabel: ['Dg', 'Dl', 'Dt', 'Dc', 'Dj', 'Dv', 'Ds'][d.getDay()],
+        dayLabel: DAY_CODES[d.getDay()],
         shifts: data?.shifts ?? 0,
         employees: data?.employees ?? [],
         covered: (data?.shifts ?? 0) >= locations.length,
@@ -270,6 +271,22 @@ router.get('/staffing', async (req: AuthRequest, res: Response, next: NextFuncti
     });
   } catch (err) { next(err); }
 });
+
+// ─── Helpers ──────────────────────────────────────────────────────────────────
+
+/** Short ISO-like day codes, index 0 = Sunday (matches Date#getDay). */
+const DAY_CODES = ['SUN', 'MON', 'TUE', 'WED', 'THU', 'FRI', 'SAT'];
+
+/** Parses "YYYY-MM-DD" as a local date (avoids the UTC shift of `new Date(str)`). */
+function parseLocalDate(iso: string): Date {
+  const [y, m, d] = iso.split('-').map(Number);
+  return new Date(y, m - 1, d);
+}
+
+function toLocalISO(d: Date): string {
+  const pad = (n: number) => String(n).padStart(2, '0');
+  return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}`;
+}
 
 // ─── Helper: número de setmana ISO ────────────────────────────────────────────
 function getISOWeek(date: Date): number {

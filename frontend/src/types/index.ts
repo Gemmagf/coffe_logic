@@ -25,10 +25,11 @@ export interface User {
 export interface Location {
   id: string;
   name: string;
-  address?: string;
+  address?: string | null;
   timezone: string;
   groupId: string;
   createdAt: string;
+  _count?: { employees: number; schedules: number };
 }
 
 export interface Employee {
@@ -64,10 +65,11 @@ export interface OrderItem {
 export interface Supplier {
   id: string;
   name: string;
-  contact?: string;
-  email?: string;
-  phone?: string;
+  contact?: string | null;
+  email?: string | null;
+  phone?: string | null;
   groupId: string;
+  _count?: { orders: number };
 }
 
 export interface Order {
