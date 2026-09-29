@@ -12,8 +12,8 @@ import Button from '../components/ui/Button';
 import Icon from '../components/ui/Icon';
 import { Field, Input } from '../components/ui/Field';
 
-const DEMO_USER = 'the commercial project';
-const DEMO_PASS = 'Nikos';
+const DEMO_USER = 'demo';
+const DEMO_PASS = 'demo1234';
 
 export default function Login() {
   const { t } = useTranslation();

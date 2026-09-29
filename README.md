@@ -9,6 +9,7 @@ Plataforma de **Massiu Soft** per a cafeteries, restaurants i bars amb un o més
 ```
 backend/   Express + TypeScript + Prisma (SQLite)      → API REST a /api
 frontend/  React 18 + Vite + TypeScript + React Query  → SPA (hash routing)
+shared/    conjunt de dades de demo compartit (frontend sense servidor + llavor del backend)
 scripts/   utilitats (comprovació de fitxers d'idioma)
 ```
 
@@ -23,7 +24,7 @@ npm run db:seed             # dades de demo (Mosaik Kaffee, cafeteria fictícia 
 npm run dev                 # backend :4000 + frontend :5173
 ```
 
-Les credencials de la demo són a `backend/prisma/seed.ts` (compte de propietari i compte de manager `elena` / `demo1234`). A la web pública, el botó *Provar la demo* entra directament.
+Compte de demo pública: `demo` / `demo1234` (propietari) i `elena` / `demo1234` (manager). Les dades de demo es defineixen una sola vegada a `shared/demo-dataset.ts` i les fan servir tant la llavor del servidor com la versió sense servidor; hi ha un segon perfil privat amb les seves pròpies credencials.
 
 La demo és **Mosaik Kaffee**, una cafeteria d'especialitat fictícia de Zúric amb tres locals (Kreis 4, Limmatquai i una petita torradora): equip de 9 persones amb hores de contracte, torradors i forn com a proveïdors, vendes diàries de 8 setmanes i torns de 5 setmanes.
 
