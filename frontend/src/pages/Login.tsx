@@ -1,6 +1,7 @@
 import { useState, type FormEvent } from 'react';
 import { useNavigate, useLocation } from 'react-router-dom';
 import { useTranslation } from 'react-i18next';
+import { useQueryClient } from '@tanstack/react-query';
 import { login } from '../api/auth';
 import { DEMO } from '../api/client';
 import { useAuthStore } from '../store/authStore';
@@ -20,6 +21,7 @@ export default function Login() {
   const navigate = useNavigate();
   const location = useLocation();
   const setAuth = useAuthStore((s) => s.setAuth);
+  const queryClient = useQueryClient();
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [showPw, setShowPw] = useState(false);
@@ -32,6 +34,7 @@ export default function Login() {
     setBusy(kind);
     try {
       const { token, user } = await login(e, p);
+      queryClient.clear(); // never show another account's cached data
       setAuth(token, user);
       navigate('/', { replace: true });
     } catch (err) {
