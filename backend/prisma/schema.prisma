@@ -38,6 +38,7 @@ model Group {
 model User {
   id           String   @id @default(cuid())
   email        String   @unique
+  username     String?  @unique // optional short login name, stored lowercase
   passwordHash String
   role         String   @default("EMPLOYEE")
   createdAt    DateTime @default(now())
@@ -70,11 +71,13 @@ model Location {
 }
 
 model Employee {
-  id        String   @id @default(cuid())
-  name      String
-  email     String?
-  phone     String?
-  createdAt DateTime @default(now())
+  id          String   @id @default(cuid())
+  name        String
+  email       String?
+  phone       String?
+  position    String?  // e.g. "Head barista"
+  weeklyHours Int?     // contract hours per week, used to balance schedules
+  createdAt   DateTime @default(now())
   updatedAt DateTime @updatedAt
 
   groupId          String

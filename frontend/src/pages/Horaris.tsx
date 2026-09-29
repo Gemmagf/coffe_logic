@@ -1,5 +1,5 @@
 import { useMemo, useState, useEffect } from 'react';
-import { useSearchParams } from 'react-router-dom';
+import { useNavigate, useSearchParams } from 'react-router-dom';
 import { addDays, startOfWeek, isSameDay } from 'date-fns';
 import { useTranslation } from 'react-i18next';
 import PageHeader from '../components/ui/PageHeader';
@@ -33,6 +33,7 @@ export default function Horaris() {
   const confirm = useConfirm();
   const canManage = useCanManage();
   const [params, setParams] = useSearchParams();
+  const navigate = useNavigate();
   const [weekStart, setWeekStart] = useState(() => startOfWeek(new Date(), { weekStartsOn: 1 }));
   const [filterLocation, setFilterLocation] = useState('');
   const [filterEmployee, setFilterEmployee] = useState('');
@@ -62,13 +63,13 @@ export default function Horaris() {
   const totalHours = visible.reduce((s, x) => s + hoursBetween(x.startTime, x.endTime), 0);
 
   const perEmployee = useMemo(() => {
-    const map = new Map<string, { id: string; name: string; hours: number; shifts: Schedule[] }>();
+    const map = new Map<string, { id: string; name: string; hours: number; contract: number | null; shifts: Schedule[] }>();
     visible.forEach((s) => {
-      const e = map.get(s.employeeId) ?? { id: s.employeeId, name: s.employee.name, hours: 0, shifts: [] };
+      const e = map.get(s.employeeId) ?? { id: s.employeeId, name: s.employee.name, hours: 0, contract: employees.data?.find((x) => x.id === s.employeeId)?.weeklyHours ?? null, shifts: [] };
       e.hours += hoursBetween(s.startTime, s.endTime); e.shifts.push(s); map.set(s.employeeId, e);
     });
     return [...map.values()].sort((a, b) => b.hours - a.hours);
-  }, [visible]);
+  }, [visible, employees.data]);
 
   const isCurrentWeek = isSameDay(weekStart, startOfWeek(new Date(), { weekStartsOn: 1 }));
 
@@ -204,7 +205,7 @@ export default function Horaris() {
                         </td>
                       );
                     })}
-                    <td className="num t-strong">{fmtHours(e.hours)}</td>
+                    <td className="num t-strong" style={{ whiteSpace: 'nowrap' }}>{fmtHours(e.hours)}{e.contract ? <span className="t-3" style={{ fontWeight: 500 }}> / {e.contract} h</span> : null}</td>
                   </tr>
                 ))}
               </tbody>
@@ -215,12 +216,22 @@ export default function Horaris() {
 
       {perEmployee.length > 0 && view === 'week' && (
         <Card className="mt-5">
-          <CardHead title={t('schedules.hoursByEmployee')} sub={t('schedules.hoursByEmployeeSub')} />
+          <CardHead title={t('schedules.hoursByEmployee')} sub={t('schedules.hoursByEmployeeSub')} action={<Button size="sm" variant="ghost" iconRight="arrowRight" onClick={() => navigate('/empleats')}>{t('nav.employees')}</Button>} />
           <div className="grid-auto" style={{ gap: 10 }}>
             {perEmployee.map((e) => (
-              <div key={e.id} className="row between" style={{ padding: '8px 10px', borderRadius: 10, background: 'var(--surface-2)' }}>
-                <span className="row gap-3 t-truncate"><Avatar name={e.name} id={e.id} size={26} /><span className="t-sm t-strong t-truncate">{e.name}</span></span>
-                <span className="row gap-2"><Badge>{e.shifts.length} {t('schedules.shiftsShort')}</Badge><span className="t-sm t-strong t-num">{fmtHours(e.hours)}</span></span>
+              <div key={e.id} className="col" style={{ gap: 6, padding: '8px 10px', borderRadius: 10, background: 'var(--surface-2)' }}>
+                <div className="row between">
+                  <span className="row gap-3 t-truncate"><Avatar name={e.name} id={e.id} size={26} /><span className="t-sm t-strong t-truncate">{e.name}</span></span>
+                  <span className="row gap-2" style={{ whiteSpace: 'nowrap' }}><Badge>{e.shifts.length} {t('schedules.shiftsShort')}</Badge><span className="t-sm t-strong t-num">{fmtHours(e.hours)}{e.contract ? <span className="t-3" style={{ fontWeight: 500 }}> / {e.contract} h</span> : null}</span></span>
+                </div>
+                {e.contract ? (
+                  <div className="row gap-2">
+                    <div className="progress grow"><div style={{ width: `${Math.min(100, (e.hours / e.contract) * 100)}%`, background: e.hours > e.contract ? 'var(--danger)' : e.hours < e.contract * 0.8 ? 'var(--warning)' : 'var(--success)' }} /></div>
+                    <span className={`t-xs ${e.hours > e.contract ? 't-danger' : e.hours < e.contract * 0.8 ? 't-warning' : 't-success'}`} style={{ whiteSpace: 'nowrap' }}>
+                      {e.hours > e.contract ? t('schedules.overContract', { h: fmtNum(e.hours - e.contract, 1) }) : e.hours < e.contract ? t('schedules.underContract', { h: fmtNum(e.contract - e.hours, 1) }) : t('schedules.onContract')}
+                    </span>
+                  </div>
+                ) : <span className="t-xs t-4">{t('schedules.noContract')}</span>}
               </div>
             ))}
           </div>

@@ -51,7 +51,7 @@
     "email": "E-mail",
     "password": "Password",
     "login": "Accedi",
-    "subtitle": "Gestione multi-sede per caffetterie",
+    "subtitle": "Gestione per caffetterie, ristoranti e bar",
     "welcome": "Bentornato/a",
     "welcomeSub": "Accedi al tuo account o prova la demo con dati di esempio.",
     "headline1": "Tutto il tuo caffè,",
@@ -65,8 +65,10 @@
     "hidePassword": "Nascondi password",
     "expired": "La sessione è scaduta. Accedi di nuovo.",
     "error": "Accesso non riuscito",
-    "demoModeHint": "Questa versione funziona senza server: qualsiasi credenziale apre la demo.",
-    "demoCredentials": "Account demo: {{email}} · {{password}}"
+    "demoModeHint": "versione senza server",
+    "demoCredentials": "Accesso demo: utente «{{email}}» · password «{{password}}»",
+    "identifier": "Nome utente o e-mail",
+    "identifierPlaceholder": "the commercial project"
   },
   "dashboard": {
     "goodMorning": "Buongiorno",
@@ -154,7 +156,11 @@
     "emptyWeek": "Nessun turno questa settimana",
     "emptyWeekDesc": "Copia la settimana precedente o genera una proposta automatica da preferenze e vacanze.",
     "hoursByEmployee": "Ore per collaboratore",
-    "hoursByEmployeeSub": "Totale pianificato questa settimana"
+    "hoursByEmployeeSub": "Totale pianificato questa settimana",
+    "overContract": "+{{h}} h oltre il contratto",
+    "underContract": "{{h}} h sotto il contratto",
+    "onContract": "Secondo contratto",
+    "noContract": "Nessuna ora contrattuale"
   },
   "employees": {
     "title": "Team",
@@ -217,7 +223,11 @@
       "PENDING": "In sospeso",
       "APPROVED": "Approvata",
       "REJECTED": "Rifiutata"
-    }
+    },
+    "position": "Posizione",
+    "positionPlaceholder": "Barista, servizio, cucina…",
+    "weeklyHours": "Ore contrattuali / settimana",
+    "weeklyHoursHint": "Confrontate con le ore pianificate"
   },
   "orders": {
     "title": "Ordini",
@@ -365,7 +375,8 @@
     "legend_partial": "Parziale",
     "legend_uncovered": "Nessun turno",
     "weekLabel": "Settimana {{w}}",
-    "noFullWeek": "Nessuna settimana completa"
+    "noFullWeek": "Nessuna settimana completa",
+    "fullWeeksOnly": "Solo settimane complete"
   },
   "proposal": {
     "title": "Genera proposta di orario",
@@ -409,7 +420,8 @@
     "configNeeds": "Configura fabbisogno",
     "generate": "Genera proposta",
     "resultOk": "{{n}} turni creati.",
-    "resultErrors": "{{ok}} turni creati, {{errors}} saltati per sovrapposizione."
+    "resultErrors": "{{ok}} turni creati, {{errors}} saltati per sovrapposizione.",
+    "respectContract": "Non superare le ore contrattuali settimanali"
   },
   "settings": {
     "title": "Impostazioni",
@@ -442,7 +454,7 @@
     "theme": "Tema",
     "language": "Lingua",
     "about": "Informazioni su Cafgic",
-    "aboutText": "Piattaforma di gestione multi-sede per caffetterie: orari, team, ordini, cassa e previsioni, pensata per il mercato svizzero.",
+    "aboutText": "Piattaforma di gestione multi-sede per caffetterie, ristoranti e bar: turni, team, ordini, cassa e previsioni, pensata per il mercato svizzero.",
     "saved": "Modifiche salvate.",
     "deleted": "Eliminato."
   }

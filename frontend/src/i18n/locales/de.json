@@ -51,7 +51,7 @@
     "email": "E-Mail",
     "password": "Passwort",
     "login": "Anmelden",
-    "subtitle": "Café-Verwaltung für mehrere Standorte",
+    "subtitle": "Verwaltung für Cafés, Restaurants und Bars",
     "welcome": "Willkommen zurück",
     "welcomeSub": "Melden Sie sich an oder testen Sie die Demo mit Beispieldaten.",
     "headline1": "Ihr ganzes Café,",
@@ -65,8 +65,10 @@
     "hidePassword": "Passwort ausblenden",
     "expired": "Ihre Sitzung ist abgelaufen. Bitte melden Sie sich erneut an.",
     "error": "Anmeldung fehlgeschlagen",
-    "demoModeHint": "Diese Version läuft ohne Server: Beliebige Zugangsdaten öffnen die Demo.",
-    "demoCredentials": "Demokonto: {{email}} · {{password}}"
+    "demoModeHint": "Version ohne Server",
+    "demoCredentials": "Demo-Zugang: Benutzer «{{email}}» · Passwort «{{password}}»",
+    "identifier": "Benutzername oder E-Mail",
+    "identifierPlaceholder": "the commercial project"
   },
   "dashboard": {
     "goodMorning": "Guten Morgen",
@@ -154,7 +156,11 @@
     "emptyWeek": "Keine Schichten in dieser Woche",
     "emptyWeekDesc": "Kopieren Sie die Vorwoche oder erstellen Sie einen automatischen Vorschlag aus Präferenzen und Ferien.",
     "hoursByEmployee": "Stunden pro Mitarbeiter",
-    "hoursByEmployeeSub": "Gesamt geplant diese Woche"
+    "hoursByEmployeeSub": "Gesamt geplant diese Woche",
+    "overContract": "+{{h}} h über Vertrag",
+    "underContract": "{{h}} h unter Vertrag",
+    "onContract": "Gemäss Vertrag",
+    "noContract": "Keine Vertragsstunden hinterlegt"
   },
   "employees": {
     "title": "Team",
@@ -217,7 +223,11 @@
       "PENDING": "Offen",
       "APPROVED": "Genehmigt",
       "REJECTED": "Abgelehnt"
-    }
+    },
+    "position": "Position",
+    "positionPlaceholder": "Barista, Service, Küche…",
+    "weeklyHours": "Vertragsstunden / Woche",
+    "weeklyHoursHint": "Zum Vergleich mit den geplanten Stunden"
   },
   "orders": {
     "title": "Bestellungen",
@@ -365,7 +375,8 @@
     "legend_partial": "Teilweise",
     "legend_uncovered": "Keine Schichten",
     "weekLabel": "Woche {{w}}",
-    "noFullWeek": "Noch keine vollständige Woche"
+    "noFullWeek": "Noch keine vollständige Woche",
+    "fullWeeksOnly": "Nur vollständige Wochen"
   },
   "proposal": {
     "title": "Dienstplanvorschlag erstellen",
@@ -409,7 +420,8 @@
     "configNeeds": "Bedarf festlegen",
     "generate": "Vorschlag erstellen",
     "resultOk": "{{n}} Schichten erstellt.",
-    "resultErrors": "{{ok}} Schichten erstellt, {{errors}} wegen Überlappung übersprungen."
+    "resultErrors": "{{ok}} Schichten erstellt, {{errors}} wegen Überlappung übersprungen.",
+    "respectContract": "Wöchentliche Vertragsstunden nicht überschreiten"
   },
   "settings": {
     "title": "Einstellungen",
@@ -442,7 +454,7 @@
     "theme": "Design",
     "language": "Sprache",
     "about": "Über Cafgic",
-    "aboutText": "Verwaltungsplattform für Cafés mit mehreren Standorten: Dienstpläne, Team, Bestellungen, Kasse und Prognose, entwickelt für den Schweizer Markt.",
+    "aboutText": "Plattform zur Verwaltung mehrerer Standorte für Cafés, Restaurants und Bars: Dienstpläne, Team, Bestellungen, Kasse und Prognosen, entwickelt für den Schweizer Markt.",
     "saved": "Änderungen gespeichert.",
     "deleted": "Gelöscht."
   }

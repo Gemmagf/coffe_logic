@@ -1,253 +1,215 @@
 /**
- * Mock data for demo mode (GitHub Pages — no backend required).
- * All dates are generated relative to today so the demo always looks "current".
+ * Demo dataset for GitHub Pages (no backend): "Commercial – The Project",
+ * a specialty coffee business in Zürich. Mirrors backend/prisma/seed.ts.
+ * Dates are generated relative to today so the demo always looks current.
  */
-import type {
-  Location, Employee, Schedule, Order, CashClosing,
-  VacationRequest, ShiftPreference,
-} from '../../types';
+import type { Location, Employee, Schedule, Order, CashClosing, VacationRequest, ShiftPreference, Supplier } from '../../types';
 
-// ─── Helpers ──────────────────────────────────────────────────────────────────
-
-const fmt = (d: Date) => d.toISOString().slice(0, 10);
-
-function addDays(d: Date, n: number): Date {
-  const r = new Date(d);
-  r.setDate(r.getDate() + n);
-  return r;
-}
-
-function mondayOf(d: Date): Date {
-  const day = d.getDay();
-  return addDays(d, day === 0 ? -6 : 1 - day);
-}
+const fmt = (d: Date) => { const p = (n: number) => String(n).padStart(2, '0'); return `${d.getFullYear()}-${p(d.getMonth() + 1)}-${p(d.getDate())}`; };
+function addDays(d: Date, n: number): Date { const r = new Date(d); r.setDate(r.getDate() + n); return r; }
+function mondayOf(d: Date): Date { return addDays(d, d.getDay() === 0 ? -6 : 1 - d.getDay()); }
+const round2 = (n: number) => Math.round(n * 100) / 100;
+const rnd = (seed: number) => { const x = Math.sin(seed * 9301 + 49297) * 233280; return x - Math.floor(x); };
 
 const now = new Date();
 const TODAY = fmt(now);
 const MONDAY = mondayOf(now);
-
-function uid(prefix: string, n: number | string) { return `${prefix}-${n}`; }
-
-// ─── Static entities ──────────────────────────────────────────────────────────
+const GROUP = 'demo-group-001';
+const CREATED = '2024-01-15T08:00:00Z';
+const LOC = { feld: 'demo-loc-001', bahn: 'demo-loc-002', lab: 'demo-loc-003' } as const;
 
 export const LOCATIONS: Location[] = [
-  { id: 'demo-loc-001', name: 'The Commercial – Zürich HB',  address: 'Bahnhofplatz 1, 8001 Zürich',      timezone: 'Europe/Zurich', groupId: 'demo-group-001', createdAt: '2025-01-01T00:00:00Z' },
-  { id: 'demo-loc-002', name: 'The Commercial – Oerlikon',   address: 'Max-Bill-Platz 12, 8050 Zürich',   timezone: 'Europe/Zurich', groupId: 'demo-group-001', createdAt: '2025-01-01T00:00:00Z' },
-  { id: 'demo-loc-003', name: 'The Commercial – Enge',       address: 'Bederstrasse 57, 8002 Zürich',     timezone: 'Europe/Zurich', groupId: 'demo-group-001', createdAt: '2025-01-01T00:00:00Z' },
+  { id: LOC.feld, name: 'Commercial – Feldstrasse',     address: 'Feldstrasse 61, 8004 Zürich (Kreis 4)', timezone: 'Europe/Zurich', groupId: GROUP, createdAt: CREATED },
+  { id: LOC.bahn, name: 'Commercial – Bahnhofstrasse',  address: 'Bahnhofstrasse 75/79, 8001 Zürich',    timezone: 'Europe/Zurich', groupId: GROUP, createdAt: CREATED },
+  { id: LOC.lab,  name: 'Commercial – Roastery Lab',    address: 'Binzstrasse 12, 8045 Zürich',          timezone: 'Europe/Zurich', groupId: GROUP, createdAt: CREATED },
 ];
+const LOCNAME = Object.fromEntries(LOCATIONS.map((l) => [l.id, l.name]));
+const locRefs = (ids: string[]) => ids.map((locationId) => ({ locationId, location: { id: locationId, name: LOCNAME[locationId] } }));
 
 export const EMPLOYEES: Employee[] = [
-  { id: 'demo-emp-001', name: 'Anna Müller',       email: 'anna@commercial.ch',   phone: '+41 79 111 22 33', groupId: 'demo-group-001', createdAt: '2025-01-01T00:00:00Z',
-    locations: [{ locationId: 'demo-loc-001', location: { id: 'demo-loc-001', name: 'The Commercial – Zürich HB' } }, { locationId: 'demo-loc-003', location: { id: 'demo-loc-003', name: 'The Commercial – Enge' } }] },
-  { id: 'demo-emp-002', name: 'Marc Pérez',        email: 'marc@commercial.ch',   phone: '+41 79 222 33 44', groupId: 'demo-group-001', createdAt: '2025-01-01T00:00:00Z',
-    locations: [{ locationId: 'demo-loc-001', location: { id: 'demo-loc-001', name: 'The Commercial – Zürich HB' } }, { locationId: 'demo-loc-002', location: { id: 'demo-loc-002', name: 'The Commercial – Oerlikon' } }, { locationId: 'demo-loc-003', location: { id: 'demo-loc-003', name: 'The Commercial – Enge' } }] },
-  { id: 'demo-emp-003', name: 'Sophie Gerber',     email: 'sophie@commercial.ch', phone: '+41 79 333 44 55', groupId: 'demo-group-001', createdAt: '2025-01-01T00:00:00Z',
-    locations: [{ locationId: 'demo-loc-002', location: { id: 'demo-loc-002', name: 'The Commercial – Oerlikon' } }, { locationId: 'demo-loc-003', location: { id: 'demo-loc-003', name: 'The Commercial – Enge' } }] },
-  { id: 'demo-emp-004', name: 'Lukas Zimmermann',  email: 'lukas@commercial.ch',  phone: '+41 79 444 55 66', groupId: 'demo-group-001', createdAt: '2025-01-01T00:00:00Z',
-    locations: [{ locationId: 'demo-loc-002', location: { id: 'demo-loc-002', name: 'The Commercial – Oerlikon' } }] },
-  { id: 'demo-emp-005', name: 'Chiara Rossi',      email: 'chiara@commercial.ch', phone: '+41 79 555 66 77', groupId: 'demo-group-001', createdAt: '2025-01-01T00:00:00Z',
-    locations: [{ locationId: 'demo-loc-001', location: { id: 'demo-loc-001', name: 'The Commercial – Zürich HB' } }] },
-  { id: 'demo-emp-006', name: 'David Weber',       email: 'david@commercial.ch',  phone: '+41 79 666 77 88', groupId: 'demo-group-001', createdAt: '2025-01-01T00:00:00Z',
-    locations: [{ locationId: 'demo-loc-001', location: { id: 'demo-loc-001', name: 'The Commercial – Zürich HB' } }, { locationId: 'demo-loc-002', location: { id: 'demo-loc-002', name: 'The Commercial – Oerlikon' } }] },
-  { id: 'demo-emp-007', name: 'Julia Fischer',     email: 'julia@commercial.ch',  phone: '+41 79 777 88 99', groupId: 'demo-group-001', createdAt: '2025-01-01T00:00:00Z',
-    locations: [{ locationId: 'demo-loc-003', location: { id: 'demo-loc-003', name: 'The Commercial – Enge' } }] },
-  { id: 'demo-emp-008', name: 'Nikos Papadopoulos',email: 'nikos@commercial.ch',  phone: '+41 79 888 99 00', groupId: 'demo-group-001', createdAt: '2025-01-01T00:00:00Z',
-    locations: [{ locationId: 'demo-loc-002', location: { id: 'demo-loc-002', name: 'The Commercial – Oerlikon' } }] },
-  { id: 'demo-emp-009', name: 'Léa Dubois',        email: 'lea@commercial.ch',    phone: '+41 79 999 00 11', groupId: 'demo-group-001', createdAt: '2025-01-01T00:00:00Z',
-    locations: [{ locationId: 'demo-loc-001', location: { id: 'demo-loc-001', name: 'The Commercial – Zürich HB' } }, { locationId: 'demo-loc-003', location: { id: 'demo-loc-003', name: 'The Commercial – Enge' } }] },
+  { id: 'demo-emp-001', name: 'Elena Papadaki',  email: 'elena@commercial-theproject.ch',  phone: '+41 79 201 11 21', position: 'Head barista',      weeklyHours: 42, groupId: GROUP, createdAt: CREATED, locations: locRefs([LOC.feld, LOC.bahn]) },
+  { id: 'demo-emp-002', name: 'Luca Brunner',    email: 'luca@commercial-theproject.ch',   phone: '+41 79 202 22 32', position: 'Barista',           weeklyHours: 40, groupId: GROUP, createdAt: CREATED, locations: locRefs([LOC.bahn]) },
+  { id: 'demo-emp-003', name: 'Yannis Vlachos',  email: 'yannis@commercial-theproject.ch', phone: '+41 79 203 33 43', position: 'Roaster & barista', weeklyHours: 40, groupId: GROUP, createdAt: CREATED, locations: locRefs([LOC.lab, LOC.feld]) },
+  { id: 'demo-emp-004', name: 'Mira Keller',     email: 'mira@commercial-theproject.ch',   phone: '+41 79 204 44 54', position: 'Barista',           weeklyHours: 32, groupId: GROUP, createdAt: CREATED, locations: locRefs([LOC.feld]) },
+  { id: 'demo-emp-005', name: 'Tomás Ferreira',  email: 'tomas@commercial-theproject.ch',  phone: '+41 79 205 55 65', position: 'Barista',           weeklyHours: 40, groupId: GROUP, createdAt: CREATED, locations: locRefs([LOC.bahn, LOC.feld]) },
+  { id: 'demo-emp-006', name: 'Sofia Andreou',   email: 'sofia@commercial-theproject.ch',  phone: '+41 79 206 66 76', position: 'Service & pastry',  weeklyHours: 24, groupId: GROUP, createdAt: CREATED, locations: locRefs([LOC.feld]) },
+  { id: 'demo-emp-007', name: 'Jonas Hürlimann', email: 'jonas@commercial-theproject.ch',  phone: '+41 79 207 77 87', position: 'Barista (student)', weeklyHours: 20, groupId: GROUP, createdAt: CREATED, locations: locRefs([LOC.bahn]) },
+  { id: 'demo-emp-008', name: 'Aylin Demir',     email: 'aylin@commercial-theproject.ch',  phone: '+41 79 208 88 98', position: 'Barista',           weeklyHours: 36, groupId: GROUP, createdAt: CREATED, locations: locRefs([LOC.feld, LOC.lab]) },
+  { id: 'demo-emp-009', name: 'Noah Steiner',    email: 'noah@commercial-theproject.ch',   phone: '+41 79 209 99 09', position: 'Roastery assistant', weeklyHours: 30, groupId: GROUP, createdAt: CREATED, locations: locRefs([LOC.lab, LOC.bahn]) },
 ];
+const EMPNAME = Object.fromEntries(EMPLOYEES.map((e) => [e.id, e.name]));
 
-const EMP = Object.fromEntries(EMPLOYEES.map(e => [e.id, e]));
-const LOC = Object.fromEntries(LOCATIONS.map(l => [l.id, l]));
+export const SUPPLIERS: Supplier[] = [
+  { id: 'demo-sup-001', name: 'MAME Coffee Roasters',   contact: 'Emi Fukahori',  email: 'wholesale@mame.coffee',          phone: '+41 44 221 10 10', groupId: GROUP },
+  { id: 'demo-sup-002', name: 'Rose Coffee Roasters',   contact: 'Simon Rose',    email: 'orders@rosecoffee.ch',           phone: '+41 44 221 20 20', groupId: GROUP },
+  { id: 'demo-sup-003', name: 'Balloon Coffee',         contact: 'Nina Berger',   email: 'hello@ballooncoffee.ch',         phone: '+41 44 221 30 30', groupId: GROUP },
+  { id: 'demo-sup-004', name: 'John Baker',             contact: 'Bakery orders', email: 'b2b@johnbaker.ch',               phone: '+41 44 221 40 40', groupId: GROUP },
+  { id: 'demo-sup-005', name: 'Molkerei Seefeld',       contact: 'Ruedi Frei',    email: 'bestellung@molkerei-seefeld.ch', phone: '+41 44 221 50 50', groupId: GROUP },
+  { id: 'demo-sup-006', name: 'Barista Supply Schweiz', contact: 'Karin Vogt',    email: 'sales@baristasupply.ch',         phone: '+41 44 221 60 60', groupId: GROUP },
+];
+const SUPNAME = Object.fromEntries(SUPPLIERS.map((s) => [s.id, s.name]));
 
 // ─── Schedules ────────────────────────────────────────────────────────────────
 
-type SlotDef = { eId: string; lId: string; s: string; e: string };
-type WeekPattern = SlotDef[][];
-
-const weeklyHB: WeekPattern = [
-  [{ eId: 'demo-emp-001', lId: 'demo-loc-001', s: '07:00', e: '15:00' }, { eId: 'demo-emp-006', lId: 'demo-loc-001', s: '09:00', e: '17:00' }, { eId: 'demo-emp-009', lId: 'demo-loc-001', s: '13:00', e: '21:00' }],
-  [{ eId: 'demo-emp-001', lId: 'demo-loc-001', s: '07:00', e: '15:00' }, { eId: 'demo-emp-005', lId: 'demo-loc-001', s: '10:00', e: '18:00' }, { eId: 'demo-emp-009', lId: 'demo-loc-001', s: '13:00', e: '21:00' }],
-  [{ eId: 'demo-emp-001', lId: 'demo-loc-001', s: '07:00', e: '15:00' }, { eId: 'demo-emp-006', lId: 'demo-loc-001', s: '09:00', e: '17:00' }, { eId: 'demo-emp-002', lId: 'demo-loc-001', s: '11:00', e: '19:00' }],
-  [{ eId: 'demo-emp-001', lId: 'demo-loc-001', s: '07:00', e: '15:00' }, { eId: 'demo-emp-005', lId: 'demo-loc-001', s: '10:00', e: '18:00' }, { eId: 'demo-emp-006', lId: 'demo-loc-001', s: '12:00', e: '20:00' }],
-  [{ eId: 'demo-emp-001', lId: 'demo-loc-001', s: '07:00', e: '13:00' }, { eId: 'demo-emp-002', lId: 'demo-loc-001', s: '10:00', e: '18:00' }, { eId: 'demo-emp-005', lId: 'demo-loc-001', s: '13:00', e: '21:00' }, { eId: 'demo-emp-009', lId: 'demo-loc-001', s: '15:00', e: '23:00' }],
-  [{ eId: 'demo-emp-005', lId: 'demo-loc-001', s: '09:00', e: '17:00' }, { eId: 'demo-emp-009', lId: 'demo-loc-001', s: '10:00', e: '18:00' }, { eId: 'demo-emp-006', lId: 'demo-loc-001', s: '12:00', e: '20:00' }],
-  [{ eId: 'demo-emp-005', lId: 'demo-loc-001', s: '10:00', e: '18:00' }, { eId: 'demo-emp-009', lId: 'demo-loc-001', s: '11:00', e: '19:00' }],
-];
-
-const weeklyOerlikon: WeekPattern = [
-  [{ eId: 'demo-emp-008', lId: 'demo-loc-002', s: '07:00', e: '15:00' }, { eId: 'demo-emp-004', lId: 'demo-loc-002', s: '09:00', e: '17:00' }],
-  [{ eId: 'demo-emp-008', lId: 'demo-loc-002', s: '07:00', e: '15:00' }, { eId: 'demo-emp-003', lId: 'demo-loc-002', s: '13:00', e: '21:00' }],
-  [{ eId: 'demo-emp-008', lId: 'demo-loc-002', s: '07:00', e: '15:00' }, { eId: 'demo-emp-004', lId: 'demo-loc-002', s: '09:00', e: '17:00' }, { eId: 'demo-emp-002', lId: 'demo-loc-002', s: '13:00', e: '21:00' }],
-  [{ eId: 'demo-emp-004', lId: 'demo-loc-002', s: '09:00', e: '17:00' }, { eId: 'demo-emp-006', lId: 'demo-loc-002', s: '13:00', e: '21:00' }],
-  [{ eId: 'demo-emp-008', lId: 'demo-loc-002', s: '07:00', e: '15:00' }, { eId: 'demo-emp-004', lId: 'demo-loc-002', s: '10:00', e: '18:00' }, { eId: 'demo-emp-003', lId: 'demo-loc-002', s: '14:00', e: '22:00' }],
-  [{ eId: 'demo-emp-004', lId: 'demo-loc-002', s: '09:00', e: '17:00' }, { eId: 'demo-emp-003', lId: 'demo-loc-002', s: '10:00', e: '18:00' }],
-  [{ eId: 'demo-emp-003', lId: 'demo-loc-002', s: '10:00', e: '16:00' }, { eId: 'demo-emp-004', lId: 'demo-loc-002', s: '10:00', e: '16:00' }],
-];
-
-const weeklyEnge: WeekPattern = [
-  [{ eId: 'demo-emp-009', lId: 'demo-loc-003', s: '08:00', e: '16:00' }, { eId: 'demo-emp-007', lId: 'demo-loc-003', s: '10:00', e: '18:00' }],
-  [{ eId: 'demo-emp-009', lId: 'demo-loc-003', s: '08:00', e: '16:00' }, { eId: 'demo-emp-003', lId: 'demo-loc-003', s: '14:00', e: '22:00' }],
-  [{ eId: 'demo-emp-001', lId: 'demo-loc-003', s: '08:00', e: '14:00' }, { eId: 'demo-emp-007', lId: 'demo-loc-003', s: '11:00', e: '19:00' }],
-  [{ eId: 'demo-emp-009', lId: 'demo-loc-003', s: '08:00', e: '16:00' }, { eId: 'demo-emp-003', lId: 'demo-loc-003', s: '14:00', e: '22:00' }],
-  [{ eId: 'demo-emp-007', lId: 'demo-loc-003', s: '10:00', e: '18:00' }, { eId: 'demo-emp-002', lId: 'demo-loc-003', s: '12:00', e: '20:00' }],
-  [{ eId: 'demo-emp-007', lId: 'demo-loc-003', s: '09:00', e: '17:00' }, { eId: 'demo-emp-003', lId: 'demo-loc-003', s: '10:00', e: '18:00' }, { eId: 'demo-emp-001', lId: 'demo-loc-003', s: '11:00', e: '19:00' }],
-  [{ eId: 'demo-emp-007', lId: 'demo-loc-003', s: '10:00', e: '17:00' }],
+type Slot = { e: string; l: string; s: string; end: string };
+const WEEK: Slot[][] = [
+  [ { e: 'demo-emp-001', l: LOC.feld, s: '07:30', end: '15:30' }, { e: 'demo-emp-004', l: LOC.feld, s: '10:30', end: '17:30' },
+    { e: 'demo-emp-002', l: LOC.bahn, s: '07:30', end: '15:00' }, { e: 'demo-emp-005', l: LOC.bahn, s: '11:30', end: '19:00' } ],
+  [ { e: 'demo-emp-001', l: LOC.feld, s: '07:30', end: '15:30' }, { e: 'demo-emp-008', l: LOC.feld, s: '10:30', end: '17:30' },
+    { e: 'demo-emp-002', l: LOC.bahn, s: '07:30', end: '15:00' }, { e: 'demo-emp-005', l: LOC.bahn, s: '11:30', end: '19:00' } ],
+  [ { e: 'demo-emp-003', l: LOC.feld, s: '07:30', end: '15:30' }, { e: 'demo-emp-004', l: LOC.feld, s: '10:30', end: '17:30' },
+    { e: 'demo-emp-002', l: LOC.bahn, s: '07:30', end: '15:00' }, { e: 'demo-emp-009', l: LOC.bahn, s: '11:30', end: '19:00' } ],
+  [ { e: 'demo-emp-001', l: LOC.feld, s: '07:30', end: '15:30' }, { e: 'demo-emp-008', l: LOC.feld, s: '10:30', end: '17:30' },
+    { e: 'demo-emp-005', l: LOC.bahn, s: '07:30', end: '15:00' }, { e: 'demo-emp-002', l: LOC.bahn, s: '11:30', end: '19:00' },
+    { e: 'demo-emp-003', l: LOC.lab,  s: '09:30', end: '17:00' } ],
+  [ { e: 'demo-emp-001', l: LOC.feld, s: '07:30', end: '15:30' }, { e: 'demo-emp-004', l: LOC.feld, s: '10:30', end: '17:30' },
+    { e: 'demo-emp-005', l: LOC.bahn, s: '07:30', end: '15:00' }, { e: 'demo-emp-007', l: LOC.bahn, s: '12:00', end: '19:00' },
+    { e: 'demo-emp-003', l: LOC.lab,  s: '09:30', end: '17:00' }, { e: 'demo-emp-009', l: LOC.lab,  s: '09:30', end: '15:30' } ],
+  [ { e: 'demo-emp-008', l: LOC.feld, s: '08:30', end: '16:30' }, { e: 'demo-emp-006', l: LOC.feld, s: '09:00', end: '15:00' }, { e: 'demo-emp-004', l: LOC.feld, s: '12:00', end: '18:30' },
+    { e: 'demo-emp-002', l: LOC.bahn, s: '07:30', end: '15:00' }, { e: 'demo-emp-007', l: LOC.bahn, s: '11:30', end: '19:00' },
+    { e: 'demo-emp-009', l: LOC.lab,  s: '10:00', end: '17:00' }, { e: 'demo-emp-003', l: LOC.lab,  s: '10:00', end: '14:00' } ],
+  [ { e: 'demo-emp-008', l: LOC.feld, s: '08:30', end: '15:30' }, { e: 'demo-emp-006', l: LOC.feld, s: '09:00', end: '15:00' }, { e: 'demo-emp-005', l: LOC.feld, s: '12:00', end: '18:30' } ],
 ];
 
 function buildSchedules(): Schedule[] {
-  let counter = 0;
-  const result: Schedule[] = [];
-  for (let wOff = -3; wOff <= 0; wOff++) {
-    const mon = addDays(MONDAY, wOff * 7);
-    for (const pattern of [weeklyHB, weeklyOerlikon, weeklyEnge]) {
-      for (let d = 0; d < 7; d++) {
-        const date = fmt(addDays(mon, d));
-        for (const slot of pattern[d]) {
-          const hash = (wOff * 31 + d * 7 + slot.eId.charCodeAt(8)) & 0xFF;
-          if (wOff < 0 && hash % 11 === 0) continue; // ~9% absences
-          counter++;
-          result.push({
-            id: uid('sch', counter),
-            employeeId: slot.eId, locationId: slot.lId,
-            date, startTime: slot.s, endTime: slot.e, notes: null,
-            employee: { id: slot.eId, name: EMP[slot.eId].name },
-            location:  { id: slot.lId, name: LOC[slot.lId].name },
-            createdAt: '2025-01-01T00:00:00Z',
-          });
-        }
+  const out: Schedule[] = [];
+  let n = 0;
+  for (let w = -3; w <= 1; w++) {
+    for (let d = 0; d < 7; d++) {
+      const date = fmt(addDays(MONDAY, w * 7 + d));
+      for (const slot of WEEK[d]) {
+        if (w < 0 && rnd(w * 100 + d * 10 + slot.e.charCodeAt(9)) < 0.08) continue;
+        if (w === 1 && d >= 4) continue; // next week only planned until Thursday
+        n++;
+        out.push({ id: `sch-${n}`, employeeId: slot.e, locationId: slot.l, date, startTime: slot.s, endTime: slot.end, notes: null,
+          employee: { id: slot.e, name: EMPNAME[slot.e] }, location: { id: slot.l, name: LOCNAME[slot.l] }, createdAt: CREATED });
       }
     }
   }
-  return result;
+  return out;
 }
-
-export let SCHEDULES: Schedule[] = buildSchedules();
+export const SCHEDULES: Schedule[] = buildSchedules();
 
 // ─── Orders ───────────────────────────────────────────────────────────────────
 
-export let ORDERS: Order[] = [
-  { id: 'ord-01', supplierId: 'sup-01', locationId: 'demo-loc-001', status: 'RECEIVED', deliveryAt: fmt(addDays(now, -10)), notes: 'Entregat sense incidències.',
-    items: [{ productName: 'Espresso blend premium', quantity: 8, unit: 'kg', unitPrice: 32.50 }, { productName: 'Descafeinat', quantity: 2, unit: 'kg', unitPrice: 34.00 }],
-    supplier: { id: 'sup-01', name: 'Kaffee Zürich AG' }, location: { id: 'demo-loc-001', name: 'The Commercial – Zürich HB' }, createdAt: fmt(addDays(now, -12)) + 'T09:00:00Z' },
-  { id: 'ord-02', supplierId: 'sup-02', locationId: 'demo-loc-002', status: 'RECEIVED', deliveryAt: fmt(addDays(now, -8)), notes: 'Croissants molt frescos.',
-    items: [{ productName: 'Croissants mantequilla', quantity: 100, unit: 'u', unitPrice: 0.85 }, { productName: 'Pain au chocolat', quantity: 60, unit: 'u', unitPrice: 0.95 }, { productName: 'Baguette', quantity: 30, unit: 'u', unitPrice: 1.20 }],
-    supplier: { id: 'sup-02', name: 'Bäckerei Hug AG' }, location: { id: 'demo-loc-002', name: 'The Commercial – Oerlikon' }, createdAt: fmt(addDays(now, -10)) },
-  { id: 'ord-03', supplierId: 'sup-04', locationId: 'demo-loc-003', status: 'RECEIVED', deliveryAt: fmt(addDays(now, -5)), notes: null,
-    items: [{ productName: 'Llet sencera UHT', quantity: 60, unit: 'L', unitPrice: 1.65 }, { productName: 'Nata líquida', quantity: 12, unit: 'L', unitPrice: 2.80 }],
-    supplier: { id: 'sup-04', name: 'Swiss Dairy Co.' }, location: { id: 'demo-loc-003', name: 'The Commercial – Enge' }, createdAt: fmt(addDays(now, -7)) },
-  { id: 'ord-04', supplierId: 'sup-01', locationId: 'demo-loc-001', status: 'SENT', deliveryAt: fmt(addDays(now, 2)), notes: 'Entrega dimarts matí, preferiblement abans de les 9h.',
-    items: [{ productName: 'Espresso blend premium', quantity: 10, unit: 'kg', unitPrice: 32.50 }, { productName: 'Cafè Brasil single origin', quantity: 3, unit: 'kg', unitPrice: 41.00 }, { productName: 'Filtres V60 M', quantity: 200, unit: 'u', unitPrice: 0.08 }],
-    supplier: { id: 'sup-01', name: 'Kaffee Zürich AG' }, location: { id: 'demo-loc-001', name: 'The Commercial – Zürich HB' }, createdAt: fmt(addDays(now, -1)) },
-  { id: 'ord-05', supplierId: 'sup-01', locationId: 'demo-loc-002', status: 'SENT', deliveryAt: fmt(addDays(now, 2)), notes: null,
-    items: [{ productName: 'Espresso blend premium', quantity: 6, unit: 'kg', unitPrice: 32.50 }, { productName: 'Descafeinat', quantity: 2, unit: 'kg', unitPrice: 34.00 }],
-    supplier: { id: 'sup-01', name: 'Kaffee Zürich AG' }, location: { id: 'demo-loc-002', name: 'The Commercial – Oerlikon' }, createdAt: fmt(addDays(now, -1)) },
-  { id: 'ord-06', supplierId: 'sup-02', locationId: 'demo-loc-001', status: 'SENT', deliveryAt: fmt(addDays(now, 1)), notes: 'Entrega dijous matí.',
-    items: [{ productName: 'Croissants mantequilla', quantity: 80, unit: 'u', unitPrice: 0.85 }, { productName: 'Muffin ametlla', quantity: 40, unit: 'u', unitPrice: 1.10 }, { productName: 'Scones', quantity: 30, unit: 'u', unitPrice: 1.25 }],
-    supplier: { id: 'sup-02', name: 'Bäckerei Hug AG' }, location: { id: 'demo-loc-001', name: 'The Commercial – Zürich HB' }, createdAt: fmt(addDays(now, -2)) },
-  { id: 'ord-07', supplierId: 'sup-03', locationId: 'demo-loc-003', status: 'SENT', deliveryAt: fmt(addDays(now, 3)), notes: null,
-    items: [{ productName: 'Suc de taronja natural', quantity: 20, unit: 'L', unitPrice: 3.50 }, { productName: 'Fruita de temporada', quantity: 10, unit: 'kg', unitPrice: 4.20 }],
-    supplier: { id: 'sup-03', name: 'Frische Produkte GmbH' }, location: { id: 'demo-loc-003', name: 'The Commercial – Enge' }, createdAt: fmt(addDays(now, -1)) },
-  { id: 'ord-08', supplierId: 'sup-04', locationId: 'demo-loc-001', status: 'DRAFT', deliveryAt: null, notes: 'Revisar stock avant de confirmar.',
-    items: [{ productName: 'Llet sencera UHT', quantity: 80, unit: 'L', unitPrice: 1.65 }, { productName: "Llet d'avena", quantity: 20, unit: 'L', unitPrice: 2.40 }, { productName: "Llet d'ametlla", quantity: 12, unit: 'L', unitPrice: 2.90 }],
-    supplier: { id: 'sup-04', name: 'Swiss Dairy Co.' }, location: { id: 'demo-loc-001', name: 'The Commercial – Zürich HB' }, createdAt: TODAY },
-  { id: 'ord-09', supplierId: 'sup-02', locationId: 'demo-loc-003', status: 'DRAFT', deliveryAt: null, notes: null,
-    items: [{ productName: 'Croissants mantequilla', quantity: 60, unit: 'u', unitPrice: 0.85 }, { productName: 'Carrot cake', quantity: 3, unit: 'u', unitPrice: 18.50 }, { productName: 'Cheesecake NY', quantity: 2, unit: 'u', unitPrice: 22.00 }],
-    supplier: { id: 'sup-02', name: 'Bäckerei Hug AG' }, location: { id: 'demo-loc-003', name: 'The Commercial – Enge' }, createdAt: TODAY },
-  { id: 'ord-10', supplierId: 'sup-03', locationId: 'demo-loc-002', status: 'DRAFT', deliveryAt: null, notes: null,
-    items: [{ productName: 'Suc de taronja natural', quantity: 15, unit: 'L', unitPrice: 3.50 }, { productName: 'Tomates cherry', quantity: 3, unit: 'kg', unitPrice: 6.20 }],
-    supplier: { id: 'sup-03', name: 'Frische Produkte GmbH' }, location: { id: 'demo-loc-002', name: 'The Commercial – Oerlikon' }, createdAt: TODAY },
-];
+const ORDER_DEFS = [
+  { id: 'demo-ord-001', sup: 'demo-sup-001', loc: LOC.feld, status: 'RECEIVED', created: -16, delivery: -14, items: [{ productName: 'House espresso – Brazil/Colombia (1 kg)', quantity: 8, unit: 'kg', unitPrice: 38 }, { productName: 'Decaf Colombia EA (1 kg)', quantity: 2, unit: 'kg', unitPrice: 41 }], notes: 'Delivered by bike courier, no issues.' },
+  { id: 'demo-ord-002', sup: 'demo-sup-004', loc: LOC.feld, status: 'RECEIVED', created: -15, delivery: -14, items: [{ productName: 'Butter croissant', quantity: 120, unit: 'u', unitPrice: 1.4 }, { productName: 'Cardamom bun', quantity: 60, unit: 'u', unitPrice: 2.2 }, { productName: 'Banana bread (loaf)', quantity: 6, unit: 'u', unitPrice: 12 }] },
+  { id: 'demo-ord-003', sup: 'demo-sup-005', loc: LOC.bahn, status: 'RECEIVED', created: -13, delivery: -12, items: [{ productName: 'Whole milk 3.5% (1 L)', quantity: 96, unit: 'L', unitPrice: 1.95 }, { productName: 'Oat barista (1 L)', quantity: 36, unit: 'L', unitPrice: 2.6 }] },
+  { id: 'demo-ord-004', sup: 'demo-sup-002', loc: LOC.feld, status: 'RECEIVED', created: -12, delivery: -10, items: [{ productName: 'Ethiopia Guji washed – filter (1 kg)', quantity: 3, unit: 'kg', unitPrice: 46 }, { productName: 'Kenya Kiambu AA – filter (250 g retail)', quantity: 24, unit: 'u', unitPrice: 14.5 }], notes: 'Guest roaster for the October filter menu.' },
+  { id: 'demo-ord-005', sup: 'demo-sup-006', loc: LOC.bahn, status: 'RECEIVED', created: -11, delivery: -8, items: [{ productName: 'V60 02 filters (100)', quantity: 10, unit: 'pack', unitPrice: 9.5 }, { productName: 'Takeaway cups 8 oz (500)', quantity: 2, unit: 'box', unitPrice: 55 }, { productName: 'Cup lids 8 oz (500)', quantity: 2, unit: 'box', unitPrice: 28 }] },
+  { id: 'demo-ord-006', sup: 'demo-sup-005', loc: LOC.feld, status: 'RECEIVED', created: -9, delivery: -8, items: [{ productName: 'Whole milk 3.5% (1 L)', quantity: 72, unit: 'L', unitPrice: 1.95 }, { productName: 'Oat barista (1 L)', quantity: 24, unit: 'L', unitPrice: 2.6 }] },
+  { id: 'demo-ord-007', sup: 'demo-sup-004', loc: LOC.bahn, status: 'RECEIVED', created: -8, delivery: -7, items: [{ productName: 'Butter croissant', quantity: 100, unit: 'u', unitPrice: 1.4 }, { productName: 'Cinnamon bun', quantity: 50, unit: 'u', unitPrice: 2.2 }, { productName: 'Cookies (choc chip)', quantity: 60, unit: 'u', unitPrice: 1.1 }] },
+  { id: 'demo-ord-008', sup: 'demo-sup-001', loc: LOC.bahn, status: 'SENT', created: -2, delivery: 1, items: [{ productName: 'House espresso – Brazil/Colombia (1 kg)', quantity: 10, unit: 'kg', unitPrice: 38 }, { productName: 'Decaf Colombia EA (1 kg)', quantity: 2, unit: 'kg', unitPrice: 41 }], notes: 'Please deliver before 9:00, the showroom entrance is closed later.' },
+  { id: 'demo-ord-009', sup: 'demo-sup-003', loc: LOC.lab, status: 'SENT', created: -2, delivery: 2, items: [{ productName: 'Green coffee – Colombia Huila (30 kg)', quantity: 2, unit: 'box', unitPrice: 310 }, { productName: 'Green coffee – Ethiopia Sidamo (30 kg)', quantity: 1, unit: 'box', unitPrice: 365 }], notes: 'Sample roast for the tasting menu.' },
+  { id: 'demo-ord-010', sup: 'demo-sup-004', loc: LOC.feld, status: 'SENT', created: -1, delivery: 1, items: [{ productName: 'Butter croissant', quantity: 120, unit: 'u', unitPrice: 1.4 }, { productName: 'Cardamom bun', quantity: 60, unit: 'u', unitPrice: 2.2 }, { productName: 'Espresso bun (weekend)', quantity: 40, unit: 'u', unitPrice: 2.4 }, { productName: 'NY cheesecake (whole)', quantity: 2, unit: 'u', unitPrice: 38 }], notes: 'Weekend buns for Saturday morning.' },
+  { id: 'demo-ord-011', sup: 'demo-sup-006', loc: LOC.feld, status: 'DRAFT', created: 0, items: [{ productName: 'Matcha ceremonial (100 g)', quantity: 4, unit: 'u', unitPrice: 32 }, { productName: 'Origami dripper filters (100)', quantity: 6, unit: 'pack', unitPrice: 11 }], notes: 'Check stock in the back room before sending.' },
+  { id: 'demo-ord-012', sup: 'demo-sup-002', loc: LOC.bahn, status: 'DRAFT', created: 0, items: [{ productName: 'Kenya Kiambu AA – filter (250 g retail)', quantity: 36, unit: 'u', unitPrice: 14.5 }, { productName: 'Retail bags & labels', quantity: 1, unit: 'box', unitPrice: 42 }] },
+] as const;
 
-// ─── Cash Closings ────────────────────────────────────────────────────────────
+export const ORDERS: Order[] = ORDER_DEFS.map((o) => {
+  const createdAt = addDays(now, o.created); createdAt.setHours(9, 30, 0, 0);
+  return {
+    id: o.id, supplierId: o.sup, locationId: o.loc, status: o.status, items: [...o.items], notes: 'notes' in o ? o.notes : null,
+    deliveryAt: 'delivery' in o ? fmt(addDays(now, o.delivery)) : null, createdAt: createdAt.toISOString(),
+    supplier: { id: o.sup, name: SUPNAME[o.sup] }, location: { id: o.loc, name: LOCNAME[o.loc] },
+  };
+});
 
-function vary(base: number, seed: number, amp: number) {
-  const f = [1.0, 0.88, 0.93, 1.05, 1.18, 1.35, 1.25][Math.abs(seed) % 7];
-  return Math.round((base * f + (seed % 3) * amp) * 100) / 100;
+// ─── Cash closings: last 8 weeks ──────────────────────────────────────────────
+
+function salesFor(locId: string, d: Date, dOff: number): { sales: number; cardRatio: number; expenses: number } | null {
+  const dow = d.getDay();
+  const seed = Math.abs(dOff * 7 + locId.charCodeAt(9) * 13);
+  const noise = 0.88 + rnd(seed) * 0.24;
+  if (locId === LOC.feld) {
+    const base = dow === 0 || dow === 6 ? 2150 : dow === 5 ? 1650 : 1450;
+    return { sales: round2(base * noise), cardRatio: 0.78 + rnd(seed + 1) * 0.1, expenses: dow === 6 ? 45 : 18 + Math.round(rnd(seed + 2) * 20) };
+  }
+  if (locId === LOC.bahn) {
+    if (dow === 0) return null;
+    const base = dow === 6 ? 2650 : 2300;
+    return { sales: round2(base * noise), cardRatio: 0.84 + rnd(seed + 1) * 0.08, expenses: 12 + Math.round(rnd(seed + 2) * 15) };
+  }
+  if (dow < 4) return null;
+  const base = dow === 6 ? 1150 : 780;
+  return { sales: round2(base * noise), cardRatio: 0.7 + rnd(seed + 1) * 0.1, expenses: 30 + Math.round(rnd(seed + 2) * 40) };
 }
 
 function buildClosings(): CashClosing[] {
-  const bases: Record<string, { weekday: number; weekend: number }> = {
-    'demo-loc-001': { weekday: 1850, weekend: 2600 },
-    'demo-loc-002': { weekday: 1250, weekend: 1750 },
-    'demo-loc-003': { weekday: 1450, weekend: 2050 },
-  };
-  const result: CashClosing[] = [];
-  let counter = 0;
-  for (let dOff = -13; dOff <= 0; dOff++) {
+  const out: CashClosing[] = [];
+  let n = 0;
+  for (let dOff = -55; dOff <= 0; dOff++) {
     const d = addDays(now, dOff);
-    const dateStr = fmt(d);
-    const isWeekend = d.getDay() === 0 || d.getDay() === 6;
     for (const loc of LOCATIONS) {
-      const b = bases[loc.id];
-      const seed = dOff * 3 + loc.id.charCodeAt(8);
-      const sales = vary(isWeekend ? b.weekend : b.weekday, seed, 80);
-      const cardRatio = Math.min(0.85, 0.65 + Math.abs(seed % 5) * 0.04);
-      const cardSales = Math.round(sales * cardRatio * 100) / 100;
-      const cashSales = Math.round((sales - cardSales) * 100) / 100;
-      const expenses = isWeekend ? 25 : 15 + (Math.abs(dOff) % 3) * 8;
-      const disc = seed % 9 === 0 ? -4.5 : seed % 7 === 0 ? 2.0 : 0;
-      const closing = Math.round((200 + cashSales - expenses + disc) * 100) / 100; // drawer holds cash only
-      const notes = dOff === -7 && loc.id === 'demo-loc-001' ? 'TPV avariat a la tarda, algunes vendes en efectiu.'
-        : dOff === -3 && loc.id === 'demo-loc-002' ? 'Mercat proper, +20% clients.' : null;
-      counter++;
-      result.push({ id: uid('cc', counter), locationId: loc.id, date: dateStr, openingAmount: 200, closingAmount: closing, sales, cardSales, cashSales, expenses, notes, location: { id: loc.id, name: loc.name }, createdAt: dateStr + 'T22:00:00Z' });
+      const s = salesFor(loc.id, d, dOff);
+      if (!s) continue;
+      const cardSales = round2(s.sales * s.cardRatio);
+      const cashSales = round2(s.sales - cardSales);
+      const r = rnd(dOff * 3 + loc.id.charCodeAt(9));
+      const discrepancy = r < 0.12 ? -5 : r < 0.2 ? 2 : 0;
+      const closingAmount = round2(250 + cashSales - s.expenses + discrepancy);
+      const notes = dOff === -6 && loc.id === LOC.feld ? 'Card terminal offline 14:00–15:00, some sales taken in cash.'
+        : dOff === -2 && loc.id === LOC.bahn ? 'Cupping event in the evening, +30 covers.'
+        : dOff === -13 && loc.id === LOC.lab ? 'Retail bag sales strong after the Roaster of the Year post.' : null;
+      n++;
+      out.push({ id: `cc-${n}`, locationId: loc.id, date: fmt(d), openingAmount: 250, closingAmount, sales: s.sales, cardSales, cashSales, expenses: s.expenses, notes,
+        location: { id: loc.id, name: loc.name }, createdAt: fmt(d) + 'T18:30:00Z' });
     }
   }
-  return result;
+  return out;
 }
+export const CASH_CLOSINGS: CashClosing[] = buildClosings();
 
-export let CASH_CLOSINGS: CashClosing[] = buildClosings();
+// ─── Vacations & preferences ──────────────────────────────────────────────────
 
-// ─── Vacation Requests ────────────────────────────────────────────────────────
+const VAC_DEFS = [
+  { employeeId: 'demo-emp-001', from: 21, to: 28, reason: 'Trip home to Crete', status: 'PENDING', managerNote: null },
+  { employeeId: 'demo-emp-002', from: 5, to: 7, reason: 'Long weekend in Ticino', status: 'APPROVED', managerNote: 'Approved – Tomás covers Bahnhofstrasse.' },
+  { employeeId: 'demo-emp-004', from: 12, to: 12, reason: 'Medical appointment', status: 'APPROVED', managerNote: 'OK, half day is fine too.' },
+  { employeeId: 'demo-emp-007', from: 35, to: 49, reason: 'University exams', status: 'PENDING', managerNote: null },
+  { employeeId: 'demo-emp-005', from: 2, to: 3, reason: 'Concert in Milan', status: 'REJECTED', managerNote: 'Weekend before the tasting event – can we find another date?' },
+  { employeeId: 'demo-emp-008', from: 16, to: 18, reason: 'Family visit', status: 'APPROVED', managerNote: 'Approved.' },
+] as const;
+export const VACATIONS: VacationRequest[] = VAC_DEFS.map((v, i) => ({
+  id: `vac-${i + 1}`, employeeId: v.employeeId, fromDate: fmt(addDays(now, v.from)), toDate: fmt(addDays(now, v.to)), reason: v.reason, status: v.status, managerNote: v.managerNote,
+  employee: { id: v.employeeId, name: EMPNAME[v.employeeId] }, createdAt: TODAY,
+}));
 
-export let VACATIONS: VacationRequest[] = [
-  { id: 'vac-01', employeeId: 'demo-emp-001', fromDate: fmt(addDays(now, 28)), toDate: fmt(addDays(now, 35)), reason: "Vacances d'estiu a Mallorca", status: 'PENDING', managerNote: null, employee: { id: 'demo-emp-001', name: 'Anna Müller' }, createdAt: TODAY },
-  { id: 'vac-02', employeeId: 'demo-emp-003', fromDate: fmt(addDays(now, 7)),  toDate: fmt(addDays(now, 9)),  reason: 'Assumptes personals', status: 'APPROVED', managerNote: 'Aprovat. Lukas cobrirà els torns.', employee: { id: 'demo-emp-003', name: 'Sophie Gerber' }, createdAt: TODAY },
-  { id: 'vac-03', employeeId: 'demo-emp-008', fromDate: fmt(addDays(now, 14)), toDate: fmt(addDays(now, 16)), reason: 'Cita mèdica especialista', status: 'APPROVED', managerNote: 'OK. Marc disponible per Oerlikon.', employee: { id: 'demo-emp-008', name: 'Nikos Papadopoulos' }, createdAt: TODAY },
-  { id: 'vac-04', employeeId: 'demo-emp-005', fromDate: fmt(addDays(now, 3)),  toDate: fmt(addDays(now, 4)),  reason: 'Viatge de cap de setmana', status: 'REJECTED', managerNote: 'Setmana de molt moviment. Parlem per buscar alternativa.', employee: { id: 'demo-emp-005', name: 'Chiara Rossi' }, createdAt: TODAY },
-  { id: 'vac-05', employeeId: 'demo-emp-004', fromDate: fmt(addDays(now, 42)), toDate: fmt(addDays(now, 56)), reason: 'Vacances estiu (3 setmanes)', status: 'PENDING', managerNote: null, employee: { id: 'demo-emp-004', name: 'Lukas Zimmermann' }, createdAt: TODAY },
-  { id: 'vac-06', employeeId: 'demo-emp-007', fromDate: fmt(addDays(now, 21)), toDate: fmt(addDays(now, 22)), reason: 'Casament familiar', status: 'APPROVED', managerNote: 'Aprovat. Bon profit!', employee: { id: 'demo-emp-007', name: 'Julia Fischer' }, createdAt: TODAY },
-];
-
-// ─── Shift Preferences ────────────────────────────────────────────────────────
-
-export const PREFERENCES: ShiftPreference[] = [
-  { id: 'pref-01', employeeId: 'demo-emp-001', dayOfWeek: 'MON', startTime: '07:00', endTime: '15:00', locationId: 'demo-loc-001', notes: 'Prefereixo matins al HB', employee: { id: 'demo-emp-001', name: 'Anna Müller' }, createdAt: TODAY },
-  { id: 'pref-02', employeeId: 'demo-emp-001', dayOfWeek: 'TUE', startTime: '07:00', endTime: '15:00', locationId: 'demo-loc-001', notes: null, employee: { id: 'demo-emp-001', name: 'Anna Müller' }, createdAt: TODAY },
-  { id: 'pref-03', employeeId: 'demo-emp-001', dayOfWeek: 'WED', startTime: '08:00', endTime: '14:00', locationId: 'demo-loc-003', notes: 'Dimecres Enge si possible', employee: { id: 'demo-emp-001', name: 'Anna Müller' }, createdAt: TODAY },
-  { id: 'pref-04', employeeId: 'demo-emp-001', dayOfWeek: 'THU', startTime: '07:00', endTime: '15:00', locationId: 'demo-loc-001', notes: null, employee: { id: 'demo-emp-001', name: 'Anna Müller' }, createdAt: TODAY },
-  { id: 'pref-05', employeeId: 'demo-emp-001', dayOfWeek: 'FRI', startTime: '07:00', endTime: '13:00', locationId: 'demo-loc-001', notes: 'Divendres sortida aviat', employee: { id: 'demo-emp-001', name: 'Anna Müller' }, createdAt: TODAY },
-  { id: 'pref-06', employeeId: 'demo-emp-002', dayOfWeek: 'MON', startTime: '10:00', endTime: '18:00', locationId: null, notes: null, employee: { id: 'demo-emp-002', name: 'Marc Pérez' }, createdAt: TODAY },
-  { id: 'pref-07', employeeId: 'demo-emp-002', dayOfWeek: 'WED', startTime: '10:00', endTime: '18:00', locationId: 'demo-loc-002', notes: 'Dimecres prefereixo Oerlikon', employee: { id: 'demo-emp-002', name: 'Marc Pérez' }, createdAt: TODAY },
-  { id: 'pref-08', employeeId: 'demo-emp-002', dayOfWeek: 'FRI', startTime: '11:00', endTime: '19:00', locationId: null, notes: null, employee: { id: 'demo-emp-002', name: 'Marc Pérez' }, createdAt: TODAY },
-  { id: 'pref-09', employeeId: 'demo-emp-002', dayOfWeek: 'SAT', startTime: '09:00', endTime: '14:00', locationId: null, notes: null, employee: { id: 'demo-emp-002', name: 'Marc Pérez' }, createdAt: TODAY },
-  { id: 'pref-10', employeeId: 'demo-emp-003', dayOfWeek: 'TUE', startTime: '14:00', endTime: '22:00', locationId: 'demo-loc-002', notes: 'Tardes', employee: { id: 'demo-emp-003', name: 'Sophie Gerber' }, createdAt: TODAY },
-  { id: 'pref-11', employeeId: 'demo-emp-003', dayOfWeek: 'THU', startTime: '14:00', endTime: '22:00', locationId: 'demo-loc-003', notes: null, employee: { id: 'demo-emp-003', name: 'Sophie Gerber' }, createdAt: TODAY },
-  { id: 'pref-12', employeeId: 'demo-emp-003', dayOfWeek: 'SAT', startTime: '10:00', endTime: '18:00', locationId: 'demo-loc-002', notes: null, employee: { id: 'demo-emp-003', name: 'Sophie Gerber' }, createdAt: TODAY },
-  { id: 'pref-13', employeeId: 'demo-emp-003', dayOfWeek: 'SUN', startTime: '10:00', endTime: '16:00', locationId: 'demo-loc-003', notes: null, employee: { id: 'demo-emp-003', name: 'Sophie Gerber' }, createdAt: TODAY },
-  { id: 'pref-14', employeeId: 'demo-emp-004', dayOfWeek: 'MON', startTime: '09:00', endTime: '17:00', locationId: 'demo-loc-002', notes: null, employee: { id: 'demo-emp-004', name: 'Lukas Zimmermann' }, createdAt: TODAY },
-  { id: 'pref-15', employeeId: 'demo-emp-004', dayOfWeek: 'TUE', startTime: '09:00', endTime: '17:00', locationId: 'demo-loc-002', notes: null, employee: { id: 'demo-emp-004', name: 'Lukas Zimmermann' }, createdAt: TODAY },
-  { id: 'pref-16', employeeId: 'demo-emp-004', dayOfWeek: 'WED', startTime: '09:00', endTime: '17:00', locationId: 'demo-loc-002', notes: null, employee: { id: 'demo-emp-004', name: 'Lukas Zimmermann' }, createdAt: TODAY },
-  { id: 'pref-17', employeeId: 'demo-emp-004', dayOfWeek: 'THU', startTime: '09:00', endTime: '17:00', locationId: 'demo-loc-002', notes: null, employee: { id: 'demo-emp-004', name: 'Lukas Zimmermann' }, createdAt: TODAY },
-  { id: 'pref-18', employeeId: 'demo-emp-004', dayOfWeek: 'FRI', startTime: '10:00', endTime: '18:00', locationId: 'demo-loc-002', notes: null, employee: { id: 'demo-emp-004', name: 'Lukas Zimmermann' }, createdAt: TODAY },
-  { id: 'pref-19', employeeId: 'demo-emp-005', dayOfWeek: 'TUE', startTime: '10:00', endTime: '18:00', locationId: 'demo-loc-001', notes: null, employee: { id: 'demo-emp-005', name: 'Chiara Rossi' }, createdAt: TODAY },
-  { id: 'pref-20', employeeId: 'demo-emp-005', dayOfWeek: 'THU', startTime: '10:00', endTime: '18:00', locationId: 'demo-loc-001', notes: null, employee: { id: 'demo-emp-005', name: 'Chiara Rossi' }, createdAt: TODAY },
-  { id: 'pref-21', employeeId: 'demo-emp-005', dayOfWeek: 'SAT', startTime: '09:00', endTime: '17:00', locationId: 'demo-loc-001', notes: null, employee: { id: 'demo-emp-005', name: 'Chiara Rossi' }, createdAt: TODAY },
-  { id: 'pref-22', employeeId: 'demo-emp-006', dayOfWeek: 'MON', startTime: '09:00', endTime: '17:00', locationId: 'demo-loc-001', notes: null, employee: { id: 'demo-emp-006', name: 'David Weber' }, createdAt: TODAY },
-  { id: 'pref-23', employeeId: 'demo-emp-006', dayOfWeek: 'WED', startTime: '09:00', endTime: '17:00', locationId: 'demo-loc-001', notes: null, employee: { id: 'demo-emp-006', name: 'David Weber' }, createdAt: TODAY },
-  { id: 'pref-24', employeeId: 'demo-emp-006', dayOfWeek: 'THU', startTime: '13:00', endTime: '21:00', locationId: 'demo-loc-002', notes: 'Dijous tarda Oerlikon', employee: { id: 'demo-emp-006', name: 'David Weber' }, createdAt: TODAY },
-  { id: 'pref-25', employeeId: 'demo-emp-007', dayOfWeek: 'FRI', startTime: '10:00', endTime: '18:00', locationId: 'demo-loc-003', notes: null, employee: { id: 'demo-emp-007', name: 'Julia Fischer' }, createdAt: TODAY },
-  { id: 'pref-26', employeeId: 'demo-emp-007', dayOfWeek: 'SAT', startTime: '09:00', endTime: '17:00', locationId: 'demo-loc-003', notes: null, employee: { id: 'demo-emp-007', name: 'Julia Fischer' }, createdAt: TODAY },
-  { id: 'pref-27', employeeId: 'demo-emp-007', dayOfWeek: 'SUN', startTime: '10:00', endTime: '17:00', locationId: 'demo-loc-003', notes: null, employee: { id: 'demo-emp-007', name: 'Julia Fischer' }, createdAt: TODAY },
-  { id: 'pref-28', employeeId: 'demo-emp-008', dayOfWeek: 'MON', startTime: '07:00', endTime: '15:00', locationId: 'demo-loc-002', notes: null, employee: { id: 'demo-emp-008', name: 'Nikos Papadopoulos' }, createdAt: TODAY },
-  { id: 'pref-29', employeeId: 'demo-emp-008', dayOfWeek: 'TUE', startTime: '07:00', endTime: '15:00', locationId: 'demo-loc-002', notes: null, employee: { id: 'demo-emp-008', name: 'Nikos Papadopoulos' }, createdAt: TODAY },
-  { id: 'pref-30', employeeId: 'demo-emp-008', dayOfWeek: 'WED', startTime: '07:00', endTime: '15:00', locationId: 'demo-loc-002', notes: null, employee: { id: 'demo-emp-008', name: 'Nikos Papadopoulos' }, createdAt: TODAY },
-  { id: 'pref-31', employeeId: 'demo-emp-008', dayOfWeek: 'FRI', startTime: '07:00', endTime: '15:00', locationId: 'demo-loc-002', notes: null, employee: { id: 'demo-emp-008', name: 'Nikos Papadopoulos' }, createdAt: TODAY },
-  { id: 'pref-32', employeeId: 'demo-emp-009', dayOfWeek: 'MON', startTime: '13:00', endTime: '21:00', locationId: 'demo-loc-001', notes: null, employee: { id: 'demo-emp-009', name: 'Léa Dubois' }, createdAt: TODAY },
-  { id: 'pref-33', employeeId: 'demo-emp-009', dayOfWeek: 'TUE', startTime: '13:00', endTime: '21:00', locationId: 'demo-loc-001', notes: null, employee: { id: 'demo-emp-009', name: 'Léa Dubois' }, createdAt: TODAY },
-  { id: 'pref-34', employeeId: 'demo-emp-009', dayOfWeek: 'WED', startTime: '08:00', endTime: '16:00', locationId: 'demo-loc-003', notes: 'Dimecres prefereixo Enge', employee: { id: 'demo-emp-009', name: 'Léa Dubois' }, createdAt: TODAY },
-  { id: 'pref-35', employeeId: 'demo-emp-009', dayOfWeek: 'FRI', startTime: '15:00', endTime: '23:00', locationId: 'demo-loc-001', notes: null, employee: { id: 'demo-emp-009', name: 'Léa Dubois' }, createdAt: TODAY },
-];
+const PREF_DEFS = [
+  { e: 'demo-emp-001', day: 'MON', s: '07:30', end: '15:30', l: LOC.feld, notes: 'Opening shifts at Feldstrasse' },
+  { e: 'demo-emp-001', day: 'TUE', s: '07:30', end: '15:30', l: LOC.feld, notes: null },
+  { e: 'demo-emp-001', day: 'THU', s: '07:30', end: '15:30', l: LOC.feld, notes: null },
+  { e: 'demo-emp-001', day: 'FRI', s: '07:30', end: '15:30', l: LOC.feld, notes: null },
+  { e: 'demo-emp-002', day: 'MON', s: '07:30', end: '15:00', l: LOC.bahn, notes: null },
+  { e: 'demo-emp-002', day: 'TUE', s: '07:30', end: '15:00', l: LOC.bahn, notes: null },
+  { e: 'demo-emp-002', day: 'WED', s: '07:30', end: '15:00', l: LOC.bahn, notes: null },
+  { e: 'demo-emp-002', day: 'SAT', s: '07:30', end: '15:00', l: LOC.bahn, notes: 'Saturday mornings OK' },
+  { e: 'demo-emp-003', day: 'THU', s: '09:30', end: '17:00', l: LOC.lab, notes: 'Roast days' },
+  { e: 'demo-emp-003', day: 'FRI', s: '09:30', end: '17:00', l: LOC.lab, notes: null },
+  { e: 'demo-emp-003', day: 'WED', s: '07:30', end: '15:30', l: LOC.feld, notes: null },
+  { e: 'demo-emp-004', day: 'MON', s: '10:30', end: '17:30', l: LOC.feld, notes: null },
+  { e: 'demo-emp-004', day: 'WED', s: '10:30', end: '17:30', l: LOC.feld, notes: null },
+  { e: 'demo-emp-004', day: 'FRI', s: '10:30', end: '17:30', l: LOC.feld, notes: 'No Sundays please' },
+  { e: 'demo-emp-005', day: 'MON', s: '11:30', end: '19:00', l: LOC.bahn, notes: null },
+  { e: 'demo-emp-005', day: 'TUE', s: '11:30', end: '19:00', l: LOC.bahn, notes: null },
+  { e: 'demo-emp-005', day: 'THU', s: '07:30', end: '15:00', l: LOC.bahn, notes: null },
+  { e: 'demo-emp-005', day: 'SUN', s: '12:00', end: '18:30', l: LOC.feld, notes: null },
+  { e: 'demo-emp-006', day: 'SAT', s: '09:00', end: '15:00', l: LOC.feld, notes: 'Weekends only' },
+  { e: 'demo-emp-006', day: 'SUN', s: '09:00', end: '15:00', l: LOC.feld, notes: null },
+  { e: 'demo-emp-007', day: 'FRI', s: '12:00', end: '19:00', l: LOC.bahn, notes: 'After lectures' },
+  { e: 'demo-emp-007', day: 'SAT', s: '11:30', end: '19:00', l: LOC.bahn, notes: null },
+  { e: 'demo-emp-008', day: 'TUE', s: '10:30', end: '17:30', l: LOC.feld, notes: null },
+  { e: 'demo-emp-008', day: 'THU', s: '10:30', end: '17:30', l: LOC.feld, notes: null },
+  { e: 'demo-emp-008', day: 'SAT', s: '08:30', end: '16:30', l: LOC.feld, notes: null },
+  { e: 'demo-emp-008', day: 'SUN', s: '08:30', end: '15:30', l: LOC.feld, notes: null },
+  { e: 'demo-emp-009', day: 'WED', s: '11:30', end: '19:00', l: LOC.bahn, notes: null },
+  { e: 'demo-emp-009', day: 'FRI', s: '09:30', end: '15:30', l: LOC.lab, notes: null },
+  { e: 'demo-emp-009', day: 'SAT', s: '10:00', end: '17:00', l: LOC.lab, notes: 'Cupping sessions' },
+] as const;
+export const PREFERENCES: ShiftPreference[] = PREF_DEFS.map((p, i) => ({
+  id: `pref-${i + 1}`, employeeId: p.e, dayOfWeek: p.day, startTime: p.s, endTime: p.end, locationId: p.l, notes: p.notes,
+  employee: { id: p.e, name: EMPNAME[p.e] }, createdAt: TODAY,
+}));
 
 export { TODAY, MONDAY, addDays, fmt };

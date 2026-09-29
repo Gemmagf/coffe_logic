@@ -51,7 +51,7 @@
     "email": "Email",
     "password": "Password",
     "login": "Sign in",
-    "subtitle": "Multi-location café management",
+    "subtitle": "Management for cafés, restaurants and bars",
     "welcome": "Welcome back",
     "welcomeSub": "Sign in to your account or try the demo with sample data.",
     "headline1": "Your whole café,",
@@ -65,8 +65,10 @@
     "hidePassword": "Hide password",
     "expired": "Your session has expired. Please sign in again.",
     "error": "Could not sign in",
-    "demoModeHint": "This build runs without a server: any credentials open the demo.",
-    "demoCredentials": "Demo account: {{email}} · {{password}}"
+    "demoModeHint": "serverless build",
+    "demoCredentials": "Demo access: user “{{email}}” · password “{{password}}”",
+    "identifier": "Username or email",
+    "identifierPlaceholder": "the commercial project"
   },
   "dashboard": {
     "goodMorning": "Good morning",
@@ -154,7 +156,11 @@
     "emptyWeek": "No shifts this week",
     "emptyWeekDesc": "Copy the previous week or generate an automatic proposal from preferences and vacations.",
     "hoursByEmployee": "Hours per employee",
-    "hoursByEmployeeSub": "Total planned this week"
+    "hoursByEmployeeSub": "Total planned this week",
+    "overContract": "+{{h}} h over contract",
+    "underContract": "{{h}} h under contract",
+    "onContract": "On contract",
+    "noContract": "No contract hours set"
   },
   "employees": {
     "title": "Team",
@@ -217,7 +223,11 @@
       "PENDING": "Pending",
       "APPROVED": "Approved",
       "REJECTED": "Rejected"
-    }
+    },
+    "position": "Position",
+    "positionPlaceholder": "Barista, service, kitchen…",
+    "weeklyHours": "Contract hours / week",
+    "weeklyHoursHint": "Compared against planned hours"
   },
   "orders": {
     "title": "Orders",
@@ -365,7 +375,8 @@
     "legend_partial": "Partial",
     "legend_uncovered": "No shifts",
     "weekLabel": "Week {{w}}",
-    "noFullWeek": "No full week yet"
+    "noFullWeek": "No full week yet",
+    "fullWeeksOnly": "Full weeks only"
   },
   "proposal": {
     "title": "Generate schedule proposal",
@@ -409,7 +420,8 @@
     "configNeeds": "Configure needs",
     "generate": "Generate proposal",
     "resultOk": "{{n}} shifts created.",
-    "resultErrors": "{{ok}} shifts created, {{errors}} skipped due to overlaps."
+    "resultErrors": "{{ok}} shifts created, {{errors}} skipped due to overlaps.",
+    "respectContract": "Do not exceed weekly contract hours"
   },
   "settings": {
     "title": "Settings",
@@ -442,7 +454,7 @@
     "theme": "Theme",
     "language": "Language",
     "about": "About Cafgic",
-    "aboutText": "Multi-location management platform for cafés: schedules, team, orders, cash and forecasting, built for the Swiss market.",
+    "aboutText": "Multi-location management platform for cafés, restaurants and bars: schedules, team, orders, cash and forecasting, built for the Swiss market.",
     "saved": "Changes saved.",
     "deleted": "Deleted."
   }

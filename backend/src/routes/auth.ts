@@ -12,9 +12,12 @@ const router = Router();
 // ─── Schemas ─────────────────────────────────────────────────────────────────
 
 const LoginSchema = z.object({
-  email: z.string().email(),
-  password: z.string().min(6),
+  email: z.string().trim().min(1), // email or username
+  password: z.string().min(1),
 });
+
+/** Usernames are compared case-insensitively and ignoring whitespace ("The Commercial Project" == "thecommercialproject"). */
+const normalizeUsername = (v: string) => v.toLowerCase().replace(/\s+/g, '');
 
 const RegisterSchema = z.object({
   email: z.string().email(),
@@ -29,12 +32,11 @@ const loginLimiter = rateLimit({ windowMs: 15 * 60 * 1000, max: 20 });
 
 router.post('/login', loginLimiter, async (req: Request, res: Response, next: NextFunction) => {
   try {
-    const { email, password } = LoginSchema.parse(req.body);
+    const { email: identifier, password } = LoginSchema.parse(req.body);
 
-    const user = await prisma.user.findUnique({
-      where: { email },
-      include: { group: true },
-    });
+    const user = identifier.includes('@')
+      ? await prisma.user.findUnique({ where: { email: identifier.toLowerCase() }, include: { group: true } })
+      : await prisma.user.findUnique({ where: { username: normalizeUsername(identifier) }, include: { group: true } });
 
     if (!user) {
       throw createError('Credencials incorrectes', 401);
