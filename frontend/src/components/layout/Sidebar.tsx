@@ -1,5 +1,6 @@
 import { NavLink, useNavigate } from 'react-router-dom';
 import { useTranslation } from 'react-i18next';
+import { useQueryClient } from '@tanstack/react-query';
 import { useState } from 'react';
 import { useAuthStore } from '../../store/authStore';
 import { useVacations } from '../../hooks/queries';
@@ -14,6 +15,7 @@ export default function Sidebar() {
   const { t } = useTranslation();
   const { user, logout } = useAuthStore();
   const navigate = useNavigate();
+  const queryClient = useQueryClient();
   const [collapsed, setCollapsed] = useState(() => localStorage.getItem('cafgic-sidebar') === 'collapsed');
   const { data: vacations } = useVacations({ status: 'PENDING' });
   const pending = vacations?.length ?? 0;
@@ -60,7 +62,7 @@ export default function Sidebar() {
         <div className="side-tools">
           <LangSwitcher className="side-tool" up />
           <ThemeToggle className="side-tool" />
-          <button className="side-tool" onClick={() => { logout(); navigate('/login'); }} title={t('common.logout')} aria-label={t('common.logout')}>
+          <button className="side-tool" onClick={() => { logout(); queryClient.clear(); navigate('/login'); }} title={t('common.logout')} aria-label={t('common.logout')}>
             <Icon name="logout" />
           </button>
         </div>
