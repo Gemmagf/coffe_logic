@@ -19,13 +19,13 @@ npm install                 # instal·la els dos workspaces
 cp .env.example backend/.env
 npm run db:generate         # client de Prisma
 npm run db:push             # crea l'esquema a SQLite
-npm run db:seed             # dades de demo (The Commercial Project)
+npm run db:seed             # dades de demo (Mosaik Kaffee, cafeteria fictícia de Zúric)
 npm run dev                 # backend :4000 + frontend :5173
 ```
 
-Credencials de demo (propietari): usuari `the commercial project` / contrasenya `Nikos`. Manager: `elena` / `demo1234`. També s'accepta el correu (`nick@commercial-theproject.ch`).
+Les credencials de la demo són a `backend/prisma/seed.ts` (compte de propietari i compte de manager `elena` / `demo1234`). A la web pública, el botó *Provar la demo* entra directament.
 
-La demo reprodueix **Commercial – The Project**, la cafeteria d'especialitat de Zúric (Feldstrasse 61 al Kreis 4 i Bahnhofstrasse 75/79) amb un tercer local inventat, el Roastery Lab: equip de 9 persones amb hores de contracte, torradors reals com a proveïdors (MAME, Rose, Balloon), forn John Baker, vendes diàries de 8 setmanes i torns de 5 setmanes.
+La demo és **Mosaik Kaffee**, una cafeteria d'especialitat fictícia de Zúric amb tres locals (Kreis 4, Limmatquai i una petita torradora): equip de 9 persones amb hores de contracte, torradors i forn com a proveïdors, vendes diàries de 8 setmanes i torns de 5 setmanes.
 
 ### Mode demo sense backend
 

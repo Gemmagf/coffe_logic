@@ -65,10 +65,10 @@
     "hidePassword": "Amagar la contrasenya",
     "expired": "La sessió ha caducat. Torna a iniciar sessió.",
     "error": "No s'ha pogut iniciar sessió",
-    "demoModeHint": "versió sense servidor",
-    "demoCredentials": "Accés de demo: usuari «{{email}}» · contrasenya «{{password}}»",
+    "demoModeHint": "Versió de demostració sense servidor: les dades són fictícies.",
     "identifier": "Usuari o correu electrònic",
-    "identifierPlaceholder": "the commercial project"
+    "identifierPlaceholder": "Nom d’usuari o correu",
+    "tryDemoSub": "Dades d’exemple d’una cafeteria amb tres locals"
   },
   "dashboard": {
     "goodMorning": "Bon dia",

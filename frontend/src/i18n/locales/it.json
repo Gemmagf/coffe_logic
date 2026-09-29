@@ -65,10 +65,10 @@
     "hidePassword": "Nascondi password",
     "expired": "La sessione è scaduta. Accedi di nuovo.",
     "error": "Accesso non riuscito",
-    "demoModeHint": "versione senza server",
-    "demoCredentials": "Accesso demo: utente «{{email}}» · password «{{password}}»",
+    "demoModeHint": "Versione demo senza server: tutti i dati sono fittizi.",
     "identifier": "Nome utente o e-mail",
-    "identifierPlaceholder": "the commercial project"
+    "identifierPlaceholder": "Nome utente o e-mail",
+    "tryDemoSub": "Dati di esempio di una caffetteria con tre sedi"
   },
   "dashboard": {
     "goodMorning": "Buongiorno",

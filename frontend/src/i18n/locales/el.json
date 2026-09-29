@@ -65,10 +65,10 @@
     "hidePassword": "Απόκρυψη κωδικού",
     "expired": "Η συνεδρία σας έληξε. Συνδεθείτε ξανά.",
     "error": "Η σύνδεση απέτυχε",
-    "demoModeHint": "έκδοση χωρίς διακομιστή",
-    "demoCredentials": "Πρόσβαση demo: χρήστης «{{email}}» · κωδικός «{{password}}»",
+    "demoModeHint": "Έκδοση demo χωρίς διακομιστή: όλα τα δεδομένα είναι πλασματικά.",
     "identifier": "Όνομα χρήστη ή email",
-    "identifierPlaceholder": "the commercial project"
+    "identifierPlaceholder": "Όνομα χρήστη ή email",
+    "tryDemoSub": "Δείγμα δεδομένων καφέ με τρία καταστήματα"
   },
   "dashboard": {
     "goodMorning": "Καλημέρα",

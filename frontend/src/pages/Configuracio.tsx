@@ -171,7 +171,7 @@ export default function Configuracio() {
         footer={<><Button variant="ghost" onClick={() => setLocModal({ open: false })}>{t('common.cancel')}</Button><Button variant="primary" type="submit" form="loc-form" icon="check" loading={locM.create.isPending || locM.update.isPending}>{t('common.save')}</Button></>}>
         <form id="loc-form" onSubmit={saveLoc} className="col gap-4">
           <Field label={t('settings.locationName')} required><Input value={locForm.name} onChange={(e) => setLocForm({ ...locForm, name: e.target.value })} required autoFocus /></Field>
-          <Field label={t('settings.address')}><Input value={locForm.address} onChange={(e) => setLocForm({ ...locForm, address: e.target.value })} placeholder="Bahnhofstrasse 1, 8001 Zürich" /></Field>
+          <Field label={t('settings.address')}><Input value={locForm.address} onChange={(e) => setLocForm({ ...locForm, address: e.target.value })} placeholder="Zweierstrasse 1, 8004 Zürich" /></Field>
           {err && <div className="error-box">{err}</div>}
         </form>
       </Modal>
