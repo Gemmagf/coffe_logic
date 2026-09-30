@@ -60,7 +60,7 @@ export default function Login() {
             <Logo size={38} />
             <div style={{ lineHeight: 1.1 }}>
               <div style={{ fontSize: 18, fontWeight: 800 }}>Cafgic</div>
-              <div style={{ fontSize: 11, opacity: 0.6, textTransform: 'uppercase', letterSpacing: '0.08em' }}>Massiu Soft</div>
+              <div style={{ fontSize: 11, opacity: 0.6, textTransform: 'uppercase', letterSpacing: '0.08em' }}>{t('auth.tagline')}</div>
             </div>
           </div>
           <div className="row gap-2">
@@ -81,7 +81,7 @@ export default function Login() {
             ))}
           </div>
         </div>
-        <div style={{ fontSize: 12, opacity: 0.55 }}>© {new Date().getFullYear()} Massiu Soft · {t('auth.subtitle')}</div>
+        <div style={{ fontSize: 12, opacity: 0.55 }}>© {new Date().getFullYear()} Cafgic · {t('auth.subtitle')}</div>
       </section>
 
       <section className="auth-form">

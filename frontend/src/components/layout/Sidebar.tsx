@@ -37,7 +37,7 @@ export default function Sidebar() {
         <Logo />
         <div className="side-logo-text">
           <span className="side-logo-name">Cafgic</span>
-          <span className="side-logo-sub">{user?.group?.name ?? 'Massiu Soft'}</span>
+          <span className="side-logo-sub">{user?.group?.name ?? t('auth.subtitle')}</span>
         </div>
       </div>
 

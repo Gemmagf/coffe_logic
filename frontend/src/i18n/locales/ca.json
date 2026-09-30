@@ -68,7 +68,8 @@
     "demoModeHint": "Versió de demostració sense servidor: les dades són fictícies.",
     "identifier": "Usuari o correu electrònic",
     "identifierPlaceholder": "Nom d’usuari o correu",
-    "tryDemoSub": "Dades d’exemple d’una cafeteria amb tres locals"
+    "tryDemoSub": "Dades d’exemple d’una cafeteria amb tres locals",
+    "tagline": "Gestió per a cafeteries"
   },
   "dashboard": {
     "goodMorning": "Bon dia",

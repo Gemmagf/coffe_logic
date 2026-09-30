@@ -68,7 +68,8 @@
     "demoModeHint": "Έκδοση demo χωρίς διακομιστή: όλα τα δεδομένα είναι πλασματικά.",
     "identifier": "Όνομα χρήστη ή email",
     "identifierPlaceholder": "Όνομα χρήστη ή email",
-    "tryDemoSub": "Δείγμα δεδομένων καφέ με τρία καταστήματα"
+    "tryDemoSub": "Δείγμα δεδομένων καφέ με τρία καταστήματα",
+    "tagline": "Διαχείριση καφέ"
   },
   "dashboard": {
     "goodMorning": "Καλημέρα",

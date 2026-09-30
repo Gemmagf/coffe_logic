@@ -68,7 +68,8 @@
     "demoModeHint": "Demo-Version ohne Server: alle Daten sind fiktiv.",
     "identifier": "Benutzername oder E-Mail",
     "identifierPlaceholder": "Benutzername oder E-Mail",
-    "tryDemoSub": "Beispieldaten eines Cafés mit drei Standorten"
+    "tryDemoSub": "Beispieldaten eines Cafés mit drei Standorten",
+    "tagline": "Café-Verwaltung"
   },
   "dashboard": {
     "goodMorning": "Guten Morgen",
