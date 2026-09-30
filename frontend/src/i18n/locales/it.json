@@ -68,7 +68,8 @@
     "demoModeHint": "Versione demo senza server: tutti i dati sono fittizi.",
     "identifier": "Nome utente o e-mail",
     "identifierPlaceholder": "Nome utente o e-mail",
-    "tryDemoSub": "Dati di esempio di una caffetteria con tre sedi"
+    "tryDemoSub": "Dati di esempio di una caffetteria con tre sedi",
+    "tagline": "Gestione per caffetterie"
   },
   "dashboard": {
     "goodMorning": "Buongiorno",

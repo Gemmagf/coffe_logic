@@ -68,7 +68,8 @@
     "demoModeHint": "Version démo sans serveur : toutes les données sont fictives.",
     "identifier": "Nom d’utilisateur ou e-mail",
     "identifierPlaceholder": "Nom d’utilisateur ou e-mail",
-    "tryDemoSub": "Données d’exemple d’un café à trois adresses"
+    "tryDemoSub": "Données d’exemple d’un café à trois adresses",
+    "tagline": "Gestion de café"
   },
   "dashboard": {
     "goodMorning": "Bonjour",

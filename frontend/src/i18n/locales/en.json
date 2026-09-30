@@ -68,7 +68,8 @@
     "demoModeHint": "Serverless demo build: all data is fictional.",
     "identifier": "Username or email",
     "identifierPlaceholder": "Username or email",
-    "tryDemoSub": "Sample data for a café with three locations"
+    "tryDemoSub": "Sample data for a café with three locations",
+    "tagline": "Café management"
   },
   "dashboard": {
     "goodMorning": "Good morning",

@@ -1,6 +1,6 @@
 # Cafgic — gestió multi-local per a cafeteries
 
-Plataforma de **Massiu Soft** per a cafeteries, restaurants i bars amb un o més locals al mercat suís: horaris i torns, equip, comandes a proveïdors, tancaments de caixa i previsió. Interfície en sis idiomes (DE · FR · IT · EN · CA · EL), mode clar i fosc, i disseny responsiu per a mòbil.
+Plataforma per a cafeteries, restaurants i bars amb un o més locals al mercat suís: horaris i torns, equip, comandes a proveïdors, tancaments de caixa i previsió. Interfície en sis idiomes (DE · FR · IT · EN · CA · EL), mode clar i fosc, i disseny responsiu per a mòbil.
 
 **Demo pública (sense servidor):** https://gemmagf.github.io/coffe_logic/ — clica *Provar la demo*.
 

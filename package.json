@@ -2,7 +2,7 @@
   "name": "coffe_logic",
   "version": "1.0.0",
   "private": true,
-  "description": "Massiu Soft \u2013 multi-local caf\u00e9 management platform for the Swiss market",
+  "description": "Cafgic \u2013 multi-location caf\u00e9 management platform for the Swiss market",
   "workspaces": [
     "backend",
     "frontend"

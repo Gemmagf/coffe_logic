@@ -162,7 +162,7 @@ export default function Configuracio() {
           <Card>
             <CardHead title={<span className="row gap-2"><Icon name="coffee" size={16} />{t('settings.about')}</span>} />
             <p className="t-sm t-2">{t('settings.aboutText')}</p>
-            <p className="t-xs t-4 mt-3">Cafgic · Massiu Soft · v2.0</p>
+            <p className="t-xs t-4 mt-3">Cafgic · v2.0</p>
           </Card>
         </div>
       </div>
