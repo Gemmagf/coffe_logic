@@ -32,10 +32,12 @@ i18n
       ca: { translation: ca },
       el: { translation: el },
     },
-    fallbackLng: 'de',
+    // Default language for now: Greek. Only an explicit choice (stored in localStorage) overrides it;
+    // the browser language is deliberately ignored so every first visit starts in Greek.
+    fallbackLng: 'el',
     defaultNS: 'translation',
     detection: {
-      order: ['localStorage', 'navigator'],
+      order: ['localStorage'],
       lookupLocalStorage: 'cafgic-lang',
       caches: ['localStorage'],
     },
